@@ -1,165 +1,203 @@
 import numpy as np
-import random
 from config import Config
 
 class CloudEdgeEnvironment:
-    def __init__(self):
+    def __init__(self, data_loader):
+        # 載入資料
+        self.task_data, self.ci_hist_raw, self.ci_pred_raw, self.edge_graph = data_loader.load_data()
+        
         self.num_edge = Config.NUM_EDGE_SERVERS
         self.time_step = 0
         
-        # State variables: The queue for each edge device (Q_i) and its corresponding queue in the cloud (Q_i^{cloud})
-        # Unit: bits
+        if self.task_data:
+            first_key = list(self.task_data.keys())[0]
+            self.max_time_steps = len(self.task_data[first_key])
+        else:
+            self.max_time_steps = 1000 
+        
+        # State Variables
         self.queues_edge = np.zeros(self.num_edge)
-        self.queues_cloud = np.zeros(self.num_edge)
+        self.queues_cloud = np.zeros(self.num_edge) 
         
-        # Carbon Intensity (k_i(t))
-        self.carbon_intensity_edge = np.zeros(self.num_edge)
-        self.carbon_intensity_cloud = 0.0
-        
-        # Channel Gains (g_{i,j}, g_{i,c})
-        self.g_edge_edge = np.zeros((self.num_edge, self.num_edge))
-        self.g_edge_cloud = np.zeros(self.num_edge)
-        
-        # Workload Arrival (A_i(t))
-        self.arrival_tasks = np.zeros(self.num_edge)
+        # Carbon Intensity State (History & Prediction)
+        # 用來模擬 DCWA.py 的 Alpha Smoothing 狀態
+        # [current, previous]
+        self.ci_hist_state = np.zeros((self.num_edge, 2)) 
+        self.ci_pred_state = np.zeros((self.num_edge, 2))
+        self.ci_cloud_hist_state = np.zeros((self.num_edge, 2))
+        self.ci_cloud_pred_state = np.zeros((self.num_edge, 2))
 
     def reset(self):
         self.time_step = 0
-        self.queues_edge.fill(0.0)
-        self.queues_cloud.fill(0.0)
-        self._update_environment_factors()
+        self.queues_edge.fill(40000000) # Preload tasks similar to DCWA logs
+        self.queues_cloud.fill(0)
+        
+        # Init CI state
+        for i in range(self.num_edge):
+            edge_name = f"Edge Server {i+1}"
+            if edge_name in self.ci_hist_raw:
+                val = self.ci_hist_raw[edge_name][0]
+                self.ci_hist_state[i] = [val, val]
+                val_pred = self.ci_pred_raw[edge_name][0]
+                self.ci_pred_state[i] = [val_pred, val_pred]
+        
         return self._get_state()
 
-    def _update_environment_factors(self):
-        """Update random variables: CI, Channel Gain, Task Arrival"""
-        # 1. Carbon Intensity (Simulate time-varying and location-varying factors)
-        self.carbon_intensity_edge = np.random.normal(Config.CI_MEAN, Config.CI_VAR, self.num_edge)
-        self.carbon_intensity_edge = np.maximum(self.carbon_intensity_edge, 0.1)
-        self.carbon_intensity_cloud = np.random.normal(Config.CI_MEAN, Config.CI_VAR)
-        
-        # 2. Channel Gains
-        for i in range(self.num_edge):
-            self.g_edge_cloud[i] = Config.get_channel_gain()
-            for j in range(self.num_edge):
-                if i != j:
-                    self.g_edge_edge[i, j] = Config.get_channel_gain()
-                    
-        # 3. Task Arrival (On-Off Model as per paper)
-        # Simplification: Use Poisson or Gaussian distribution for simulation
-        for i in range(self.num_edge):
-            if random.random() < 0.5: # ON state
-                self.arrival_tasks[i] = np.random.normal(Config.TASK_ARRIVAL_MEAN_ON, Config.TASK_ARRIVAL_MEAN_ON*0.1)
-            else: # OFF state
-                self.arrival_tasks[i] = np.random.normal(Config.TASK_ARRIVAL_MEAN_OFF, Config.TASK_ARRIVAL_MEAN_OFF*0.1)
-            self.arrival_tasks[i] = max(0, self.arrival_tasks[i])
-
     def _get_state(self):
-        """System state returned to the Agent or Solver"""
+        # 1. Update CI (Alpha Smoothing logic simulated from DCWA)
+        t = self.time_step % self.max_time_steps
+        
+        ci_edge = np.zeros(self.num_edge)
+        ci_cloud = np.zeros(self.num_edge)
+        
+        arrival_sizes = np.zeros(self.num_edge)
+        
+        for i in range(self.num_edge):
+            edge_name = f"Edge Server {i+1}"
+            
+            # CI
+            if edge_name in self.ci_hist_raw:
+                ci_edge[i] = self.ci_hist_raw[edge_name][t]
+            else:
+                ci_edge[i] = 0.5
+                
+            cloud_name = f"Cloud Server {i+1}"
+            if cloud_name in self.ci_hist_raw: 
+                ci_cloud[i] = self.ci_hist_raw[cloud_name][t]
+            else:
+                ci_cloud[i] = ci_edge[i] # Fallback
+                
+            # Task Arrival
+            if edge_name in self.task_data:
+                arrival_sizes[i] = self.task_data[edge_name][t]
+        
+        # Construct State
         return {
             'Q_edge': self.queues_edge.copy(),
             'Q_cloud': self.queues_cloud.copy(),
-            'CI_edge': self.carbon_intensity_edge.copy(),
-            'CI_cloud': self.carbon_intensity_cloud,
-            'G_ee': self.g_edge_edge.copy(),
-            'G_ec': self.g_edge_cloud.copy(),
-            'Arrival': self.arrival_tasks.copy()
+            'CI_edge': ci_edge,
+            'CI_cloud': ci_cloud,
+            'Arrival': arrival_sizes,
+            'Graph': self.edge_graph
         }
 
-    def calculate_transmission_rate(self, p_tx, gain):
-        """Shannon Formula: R = W * log2(1 + g*p / N0)"""
-        snr = (gain * p_tx) / Config.NOISE_POWER
-        return Config.BANDWIDTH * np.log2(1 + snr)
+    def compute_transmission_rate(self, p_tx, is_cloud=False):
+        # Shannon Formula: R = B * log2(1 + P*h / N0)
+        gain = Config.G_IC if is_cloud else Config.G_IJ
+        snr = (p_tx * gain) / Config.NOISE_POWER
+        rate = Config.BANDWIDTH * np.log2(1 + snr)
+        return rate
 
     def step(self, decisions):
         """
-        Execute one step of the simulatio
-        decisions is a dictionary containing the decision variables for each Edge:
-        - f_edge: [num_edge] (Local CPU freq)
-        - f_cloud: [num_edge] (Cloud CPU freq allocated to each edge task)
-        - p_tx_peer: [num_edge, num_edge] (Tx power from i to j)
-        - x_peer: [num_edge, num_edge] (Offloading amount bits from i to j)
-        - p_tx_cloud: [num_edge] (Tx power to cloud)
-        - x_cloud: [num_edge] (Offloading amount bits to cloud)
+        執行一步模擬
+        decisions: 包含 f_edge, x_peer, p_peer, x_cloud, p_cloud
         """
-        
-        # Unpack decisions
         f_edge = decisions['f_edge']
-        f_cloud = decisions['f_cloud']
-        p_tx_peer = decisions['p_tx_peer']
-        x_peer = decisions['x_peer']
-        p_tx_cloud = decisions['p_tx_cloud']
-        x_cloud = decisions['x_cloud']
+        x_peer = decisions['x_peer'] # 這是 Agent "想要" 傳輸的量
+        p_peer = decisions['p_peer']
+        x_cloud = decisions['x_cloud'] # 這是 Agent "想要" 傳輸的量
+        p_cloud = decisions['p_cloud'] 
+        f_cloud = decisions.get('f_cloud', np.zeros(self.num_edge))
+
+        state = self._get_state()
+        ci_edge = state['CI_edge']
+        ci_cloud = state['CI_cloud']
+        arrival = state['Arrival']
         
-        # --- 1. Processed bits ---
-        # Formula (2): EC_i(t) = f * T / phi
-        ec_local = (f_edge * Config.TIME_SLOT_DURATION) / Config.PHI_EDGE
-        # Formula (5): CC_i(t)
-        cc_cloud = (f_cloud * Config.TIME_SLOT_DURATION) / Config.PHI_CLOUD
+        total_carbon = 0.0
         
-        # --- 2. Objective ---
-        # Local Comp Carbon: k * xi * f^3 * T
-        carbon_local = self.carbon_intensity_edge * Config.KAPPA_EDGE * (f_edge**3) * Config.TIME_SLOT_DURATION
+        # --- 1. Process Local Tasks ---
+        capacity_local = (f_edge / Config.PHI) * Config.TIME_SLOT_DURATION
+        bits_processed_local = np.minimum(self.queues_edge, capacity_local)
         
-        # Cloud Comp Carbon
-        carbon_cloud_comp = self.carbon_intensity_cloud * Config.KAPPA_CLOUD * (f_cloud**3) * Config.TIME_SLOT_DURATION
+        # --- 2. Calculate Carbon Emission (Local) ---
+        for i in range(self.num_edge):
+            # [FIXED] 改回使用 ZETA，避免 1e27 的數值爆炸
+            # 雖然 DCWA.py 寫 bits，但其實際 Log 數值與 ZETA 公式較吻合 (1425 vs 546)
+            e_local = ci_edge[i] * (f_edge[i]**3) * Config.ZETA * Config.CONST_EMISSION_COMPUTATION
+            total_carbon += e_local
+
+        # --- 3. Cloud Processing (Remote) ---
+        capacity_cloud = (f_cloud / Config.PHI) * Config.TIME_SLOT_DURATION 
+        bits_processed_cloud = np.minimum(self.queues_cloud, capacity_cloud)
         
-        # Transmission Carbon (Peer)
-        # Time for tx = x / R
-        carbon_tx_peer = 0
+        for i in range(self.num_edge):
+            e_cloud = ci_cloud[i] * (f_cloud[i]**3) * Config.ZETA * Config.CONST_EMISSION_COMPUTATION
+            total_carbon += e_cloud
+
+        # --- 4. Transmission Physics Check (CRITICAL) ---
+        # 必須計算物理上的最大傳輸量 (Rate * Time)，不能讓 Agent 隨意傳輸無限大
+        
+        # A. Peer Offloading Limit
+        real_x_peer = np.zeros_like(x_peer)
         for i in range(self.num_edge):
             for j in range(self.num_edge):
-                if i != j and x_peer[i, j] > 0:
-                    rate = self.calculate_transmission_rate(p_tx_peer[i, j], self.g_edge_edge[i, j])
-                    if rate > 0:
-                        t_tx = x_peer[i, j] / rate
-                        carbon_tx_peer += self.carbon_intensity_edge[i] * p_tx_peer[i, j] * t_tx
+                if i == j or x_peer[i, j] <= 0: continue
+                
+                # 計算該鏈路的物理極限速率
+                if p_peer[i, j] > 0:
+                    rate = self.compute_transmission_rate(p_peer[i, j], is_cloud=False)
+                    max_bits = rate * Config.TIME_SLOT_DURATION
+                    # 實際傳輸 = min(想傳的, 物理極限)
+                    real_x_peer[i, j] = min(x_peer[i, j], max_bits)
+                    
+                    # Carbon (Tx)
+                    e_tx = ci_edge[i] * p_peer[i, j] * Config.TIME_SLOT_DURATION * Config.CONST_EMISSION_TRANSMISSION
+                    total_carbon += e_tx
+                else:
+                    real_x_peer[i, j] = 0
 
-        # Transmission Carbon (Cloud)
-        carbon_tx_cloud = 0
+        # B. Cloud Offloading Limit
+        real_x_cloud = np.zeros_like(x_cloud)
         for i in range(self.num_edge):
-            if x_cloud[i] > 0:
-                rate = self.calculate_transmission_rate(p_tx_cloud[i], self.g_edge_cloud[i])
-                if rate > 0:
-                    t_tx = x_cloud[i] / rate
-                    carbon_tx_cloud += self.carbon_intensity_edge[i] * p_tx_cloud[i] * t_tx
-
-        total_carbon = np.sum(carbon_local) + np.sum(carbon_cloud_comp) + carbon_tx_peer + carbon_tx_cloud
-
-        # --- 3. Queue Dynamics ---
-        # Formula (1): Q_i(t+1)
-        # Note: x_i(t) = x_cloud + sum(x_peer_out)
-        # incoming_peer = sum(x_peer_in)
+            if x_cloud[i] > 0 and p_cloud[i] > 0:
+                rate = self.compute_transmission_rate(p_cloud[i], is_cloud=True)
+                max_bits = rate * Config.TIME_SLOT_DURATION
+                real_x_cloud[i] = min(x_cloud[i], max_bits)
+                
+                # Carbon (Tx)
+                e_tx = ci_edge[i] * p_cloud[i] * Config.TIME_SLOT_DURATION * Config.CONST_EMISSION_TRANSMISSION
+                total_carbon += e_tx
+            else:
+                real_x_cloud[i] = 0
         
-        x_out_total = x_cloud + np.sum(x_peer, axis=1) # Total amount transferred out from each Edge
-        x_in_peer = np.sum(x_peer, axis=0)             # Total amount received by each Edge
+        # --- 5. Queue Update ---
+        # 1. 扣除本地處理
+        self.queues_edge -= bits_processed_local
         
-        # Edge Queue Update
-        # [Q - EC - x_out]+ + A + x_in
-        # Note: The actual processing volume cannot exceed the current queue size
-        processed_and_offloaded = ec_local + x_out_total
-        # Ensure the processed amount does not exceed the current queue size (Physical constraint).
-        # However, in Lyapunov formulas, full-speed processing is typically assumed; here, we apply a physical limit truncation.
-        real_processed = np.minimum(self.queues_edge, processed_and_offloaded)
+        # 2. 執行卸載 (Out)
+        # 檢查：總卸載量不能超過剩餘 Queue
+        total_out_req = np.sum(real_x_peer, axis=1) + real_x_cloud
+        actual_out_ratio = np.ones(self.num_edge)
+        mask = total_out_req > self.queues_edge
+        actual_out_ratio[mask] = self.queues_edge[mask] / (total_out_req[mask] + 1e-9)
         
-        # remaining
-        remaining = self.queues_edge - real_processed
-        # Add new
-        self.queues_edge = remaining + self.arrival_tasks + x_in_peer
+        final_x_peer = real_x_peer * actual_out_ratio[:, np.newaxis]
+        final_x_cloud = real_x_cloud * actual_out_ratio
         
-        # Cloud Queue Update Formula (4)
-        # Cloud Queue processes tasks from Edge i
-        real_cloud_processed = np.minimum(self.queues_cloud, cc_cloud)
-        self.queues_cloud = (self.queues_cloud - real_cloud_processed) + x_cloud
-
-        # --- 4. Calculate the next state ---
+        self.queues_edge -= (np.sum(final_x_peer, axis=1) + final_x_cloud)
+        
+        # 3. 接收卸載 (In) 與 新任務 (Arrival)
+        peer_in = np.sum(final_x_peer, axis=0)
+        self.queues_edge += arrival + peer_in
+        
+        # Cloud Queue Update
+        self.queues_cloud -= bits_processed_cloud
+        self.queues_cloud = np.maximum(self.queues_cloud, 0)
+        self.queues_cloud += final_x_cloud
+        
         self.time_step += 1
-        self._update_environment_factors()
-        next_state = self._get_state()
         
+        # Info stats
         info = {
             'carbon': total_carbon,
-            'q_avg': np.mean(self.queues_edge),
-            'q_cloud_avg': np.mean(self.queues_cloud)
+            'q_avg_total': np.mean(self.queues_edge),
+            'processed_local': np.mean(bits_processed_local),
+            'processed_cloud': np.mean(bits_processed_cloud),
+            'offloaded_cloud': np.mean(final_x_cloud)
         }
         
-        return next_state, total_carbon, info
+        done = self.time_step >= self.max_time_steps
+        
+        return self._get_state(), total_carbon, done, info

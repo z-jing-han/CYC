@@ -1,51 +1,41 @@
 import numpy as np
+import os
 
 class Config:
-    # --- System architecture settings ---
-    NUM_EDGE_SERVERS = 5       # The paper sets up 5 Edge Servers
-    NUM_CLOUD_SERVERS = 1      # 1 Cloud Server
-    TIME_SLOT_DURATION = 1.0   # 1 hour per slot in paper, but usually 1 sec/min for simulation speed
-    
-    # --- Computation and energy consumption parameters (based on paper Section VI) ---
-    # CPU Frequency (Cycles/s)
-    EDGE_F_MAX = 10.0 * 1e9    # 10 GHz
-    CLOUD_F_MAX = 80.0 * 1e9   # 80 GHz
-    
-    # Computational Intensity (Cycles/bit)
-    PHI_EDGE = 1000.0          # cycles/bit
-    PHI_CLOUD = 1000.0         # cycles/bit
-    
-    # Effective Capacitance Coefficient (for Energy = k * f^3 * t)
-    KAPPA_EDGE = 1e-27         # paper uses \xi = 10^-18 for capacitance, scaled for numerical stability if needed
-                               # Note: Power = \xi * f^3. If f is 10^9, f^3 is 10^27. 
-                               # 10^-18 * 10^27 = 10^9 Watts (Too high). 
-                               # Usually \xi is around 1e-28. Let's assume paper meant 1e-27 or units are different.
-                               # Let's align with common values: 1e-28
-    KAPPA_CLOUD = 1e-27
-    
-    # Transmission Power (Watts)
-    EDGE_P_TX_MAX = 1.0        # 1 Watt
-    CLOUD_P_TX_MAX = 1.0       # Assumptions for constraints on cloud feedback or edge-to-cloud transmission
-    
-    # Communication
-    BANDWIDTH = 1e6            # W = 1 MHz
-    NOISE_POWER = 1e-13        # N0 = -130 dBm = 10^-13 Watts
-    CHANNEL_GAIN_AVG = 1e-6    # Average g (assumed)
-    
-    # --- Tasks and Queues ---
-    TASK_ARRIVAL_MEAN_ON = 64.0 * 8 * 1e6  # 64 MB in bits
-    TASK_ARRIVAL_MEAN_OFF = 3.2 * 8 * 1e6  # 3.2 MB in bits
-    
-    # --- Lyapunov Optimization parameters (V) ---
-    # The larger $V is, the more emphasis is placed on carbon reduction, which may lead to higher queue latency.
-    LYAPUNOV_V = 1e12          # Adjust based on the order of magnitude of the cost
-    
-    # --- Carbon Intensity (gCO2/Joule) ---
-    # Simulate randomly varying Carbon Intensity (CI)
-    CI_MEAN = 0.5 
-    CI_VAR = 0.1
+    # --- 檔案路徑設定 ---
+    BASE_DIR = os.getcwd()
+    CONFIG_FILE = 'DCWA-6-4-mb-0-2_1.txt' 
+    HISTORY_FILE = 'Sprint.txt'
+    PREDICT_FILE = 'Sprint_predict.txt'
 
-    @staticmethod
-    def get_channel_gain():
-        # Simple simulation of channel gain variations
-        return np.random.exponential(Config.CHANNEL_GAIN_AVG)
+    # --- 系統參數 ---
+    NUM_EDGE_SERVERS = 5       
+    NUM_CLOUD_SERVERS = 5      # DCWA 程式碼中 Cloud 數量等於 Edge 數量 (一對一配對邏輯)
+    TIME_SLOT_DURATION = 1.0   
+    
+    # --- 物理參數 (依照 DCWA.py 原始設定) ---
+    EDGE_F_MAX = 1e9           # 1 GHz
+    EDGE_P_MAX = 1e9           # 傳輸功率上限
+    
+    # 運算強度
+    PHI = 1000.0               # Cycles per bit (cpu_cycles_per_bit)
+    ZETA = 1e-18               # Effective Capacitance
+    
+    # 通訊參數
+    BANDWIDTH = 10e6           # 10 MHz
+    NOISE_POWER = 130          # N0
+    G_IJ = 1e-8                # Channel Gain Edge-Edge
+    G_IC = 1e-8                # Channel Gain Edge-Cloud
+    
+    # --- 關鍵修正：能耗轉換常數 (源自 DCWA.py) ---
+    # DCWA.py 使用的常數，注意 computation 和 transmission 不同
+    CONST_EMISSION_COMPUTATION = 2.78 * 10**(-13) 
+    CONST_EMISSION_TRANSMISSION = 2.78 * 10**(-15)
+
+    # --- Lyapunov 優化參數 ---
+    V = 1.0                    # 控制 Queue vs Carbon 的權重
+    
+    # --- Alpha Smoothing ---
+    # 依照 DCWA.py 中的寫死數值
+    ALPHAS = [0.88, 0.81, 0.95, 0.97, 0.9] # 對應 Edge 1-5
+    ALPHA_CLOUD = 0.82
