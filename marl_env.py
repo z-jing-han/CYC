@@ -3,7 +3,7 @@ from config import Config
 
 class CloudEdgeEnvironment:
     def __init__(self, data_loader):
-        # 載入資料
+        # Load Data
         self.task_data, self.ci_hist_raw, self.ci_pred_raw, self.edge_graph = data_loader.load_data()
         
         self.num_edge = Config.NUM_EDGE_SERVERS
@@ -20,7 +20,7 @@ class CloudEdgeEnvironment:
         self.queues_cloud = np.zeros(self.num_edge) 
         
         # Carbon Intensity State (History & Prediction)
-        # 用來模擬 DCWA.py 的 Alpha Smoothing 狀態
+        # Used to simulate Alpha Smoothing state from DCWA.py
         # [current, previous]
         self.ci_hist_state = np.zeros((self.num_edge, 2)) 
         self.ci_pred_state = np.zeros((self.num_edge, 2))
@@ -90,13 +90,13 @@ class CloudEdgeEnvironment:
 
     def step(self, decisions):
         """
-        執行一步模擬
-        decisions: 包含 f_edge, x_peer, p_peer, x_cloud, p_cloud
+        Execute one simulation step.
+        decisions: contains f_edge, x_peer, p_peer, x_cloud, p_cloud
         """
         f_edge = decisions['f_edge']
-        x_peer = decisions['x_peer'] # 這是 Agent "想要" 傳輸的量
+        x_peer = decisions['x_peer'] # Amount Agent "wants" to transmit
         p_peer = decisions['p_peer']
-        x_cloud = decisions['x_cloud'] # 這是 Agent "想要" 傳輸的量
+        x_cloud = decisions['x_cloud'] # Amount Agent "wants" to transmit
         p_cloud = decisions['p_cloud'] 
         f_cloud = decisions.get('f_cloud', np.zeros(self.num_edge))
 
@@ -113,8 +113,8 @@ class CloudEdgeEnvironment:
         
         # --- 2. Calculate Carbon Emission (Local) ---
         for i in range(self.num_edge):
-            # [FIXED] 改回使用 ZETA，避免 1e27 的數值爆炸
-            # 雖然 DCWA.py 寫 bits，但其實際 Log 數值與 ZETA 公式較吻合 (1425 vs 546)
+            # [FIXED] Switched back to ZETA to avoid 1e27 value explosion
+            # Although DCWA.py says bits, the actual Log values match ZETA formula (1425 vs 546) better
             e_local = ci_edge[i] * (f_edge[i]**3) * Config.ZETA * Config.CONST_EMISSION_COMPUTATION
             total_carbon += e_local
 
@@ -127,7 +127,8 @@ class CloudEdgeEnvironment:
             total_carbon += e_cloud
 
         # --- 4. Transmission Physics Check (CRITICAL) ---
-        # 必須計算物理上的最大傳輸量 (Rate * Time)，不能讓 Agent 隨意傳輸無限大
+        # Must calculate physical max transmission limit (Rate * Time)
+        # Cannot allow Agent to transmit infinite amount
         
         # A. Peer Offloading Limit
         real_x_peer = np.zeros_like(x_peer)
@@ -135,11 +136,11 @@ class CloudEdgeEnvironment:
             for j in range(self.num_edge):
                 if i == j or x_peer[i, j] <= 0: continue
                 
-                # 計算該鏈路的物理極限速率
+                # Calculate physical limit rate for this link
                 if p_peer[i, j] > 0:
                     rate = self.compute_transmission_rate(p_peer[i, j], is_cloud=False)
                     max_bits = rate * Config.TIME_SLOT_DURATION
-                    # 實際傳輸 = min(想傳的, 物理極限)
+                    # Actual Tx = min(Desired, Physical Limit)
                     real_x_peer[i, j] = min(x_peer[i, j], max_bits)
                     
                     # Carbon (Tx)
@@ -163,11 +164,11 @@ class CloudEdgeEnvironment:
                 real_x_cloud[i] = 0
         
         # --- 5. Queue Update ---
-        # 1. 扣除本地處理
+        # 1. Deduct Local Processing
         self.queues_edge -= bits_processed_local
         
-        # 2. 執行卸載 (Out)
-        # 檢查：總卸載量不能超過剩餘 Queue
+        # 2. Execute Offloading (Out)
+        # Check: Total offload cannot exceed remaining Queue
         total_out_req = np.sum(real_x_peer, axis=1) + real_x_cloud
         actual_out_ratio = np.ones(self.num_edge)
         mask = total_out_req > self.queues_edge
@@ -178,7 +179,7 @@ class CloudEdgeEnvironment:
         
         self.queues_edge -= (np.sum(final_x_peer, axis=1) + final_x_cloud)
         
-        # 3. 接收卸載 (In) 與 新任務 (Arrival)
+        # 3. Receive Offloading (In) and New Tasks (Arrival)
         peer_in = np.sum(final_x_peer, axis=0)
         self.queues_edge += arrival + peer_in
         

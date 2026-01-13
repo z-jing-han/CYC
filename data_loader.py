@@ -4,20 +4,20 @@ from config import Config
 
 class DataLoader:
     def __init__(self):
-        # 從 Config 取得檔名
+        # Get filenames from Config
         self.config_file = Config.CONFIG_FILE
         self.history_file = Config.HISTORY_FILE
         self.predict_file = Config.PREDICT_FILE
 
     def load_data(self):
         """
-        載入資料的主入口。
+        Main entry point for loading data.
         """
         print(f"Initializing data loader...")
         print(f"Target Config File: {self.config_file}")
         
-        # 1. 讀取 Config 檔案 (任務到達與拓樸)
-        # 這是最關鍵的部分，若失敗則無法進行正確模擬
+        # 1. Read Config File (Task Arrivals and Topology)
+        # This is critical; simulation cannot proceed correctly if this fails.
         if os.path.exists(self.config_file):
             try:
                 task_arrival, edge_graph = self._read_dcwa_config(self.config_file)
@@ -30,7 +30,7 @@ class DataLoader:
             print(f"Config file '{self.config_file}' not found. Using synthetic task data.")
             task_arrival, _, _, edge_graph = self._generate_synthetic_data()
 
-        # 2. 嘗試讀取 CI 檔案 (Carbon Intensity)
+        # 2. Try Reading CI Files (Carbon Intensity)
         ci_history = {}
         ci_predict = {}
         if os.path.exists(self.history_file) and os.path.exists(self.predict_file):
@@ -50,8 +50,8 @@ class DataLoader:
 
     def _read_dcwa_config(self, filepath):
         """
-        專門解析 DCWA-6-4-mb-0-2_1.txt 格式
-        格式:
+        Specifically parses the DCWA-6-4-mb-0-2_1.txt format.
+        Format:
         Line 0: Num TimeSlots (e.g., 1000)
         Line 1: Num Servers (e.g., 5)
         Line 2: Neighbors (e.g., "00100 00001 ...")
@@ -73,14 +73,13 @@ class DataLoader:
                 raise ValueError("Header format error. Expected integers at line 0 and 1.")
 
             # Parse Neighbors (Line 2)
-            # 格式可能是 "00100 00001 10011..." (空格分隔)
+            # Format might be "00100 00001 10011..." (space separated)
             neighbor_parts = lines[2].split()
             
-            # 驗證格式長度
+            # Validate format length
             if len(neighbor_parts) != num_servers:
-                # 有時候可能是連在一起的長字串? 如果是這樣需要額外處理
-                # 但根據 snippet 應該是分開的
-                # 如果只有一個元素但長度是 N*N，則切分
+                # Sometimes it might be a single long string.
+                # If only one element but length is N*N, split it.
                 if len(neighbor_parts) == 1 and len(neighbor_parts[0]) == num_servers * num_servers:
                     full_str = neighbor_parts[0]
                     neighbor_parts = [full_str[i*num_servers:(i+1)*num_servers] for i in range(num_servers)]
@@ -89,7 +88,7 @@ class DataLoader:
                 edge_server_name = f"Edge Server {i + 1}"
                 edge_graph[edge_server_name] = []
                 
-                # 讀取第 i 個 server 的鄰居關係字串
+                # Read neighbor relation string for the i-th server
                 if i < len(neighbor_parts):
                     relation_str = neighbor_parts[i]
                     for j in range(num_servers):
@@ -97,15 +96,15 @@ class DataLoader:
                             edge_graph[edge_server_name].append(f"Edge Server {j + 1}")
 
             # Parse Task Arrivals
-            # 起始行數: 3 (Header+Neighbors) + 2 * num_servers (Specs)
-            # 在您提供的檔案中，第3行開始是規格，共有 5+5=10 行規格
-            # 所以 Task Arrival 從 3 + 10 = 13 行開始 (0-indexed)
+            # Start line: 3 (Header+Neighbors) + 2 * num_servers (Specs)
+            # In the provided file, specs start from line 3, total 5+5=10 spec lines.
+            # So Task Arrival starts at 3 + 10 = 13 (0-indexed)
             start_line = 3 + 2 * num_servers
             
-            # 確保不會超出檔案範圍
+            # Ensure we don't go out of bounds
             end_line = min(start_line + num_timeslots, len(lines))
             
-            # 初始化 list
+            # Initialize list
             for i in range(num_servers):
                 task_arrival_data[f"Edge Server {i + 1}"] = []
                 
@@ -115,7 +114,7 @@ class DataLoader:
                     if i < len(parts):
                         server_name = f"Edge Server {i + 1}"
                         try:
-                            val = float(parts[i]) # 讀取並轉為 float
+                            val = float(parts[i]) # Read and convert to float
                             task_arrival_data[server_name].append(val)
                         except ValueError:
                             task_arrival_data[server_name].append(0.0)
@@ -123,7 +122,7 @@ class DataLoader:
         return task_arrival_data, edge_graph
 
     def _read_ci_files(self, hist_path, pred_path):
-        """讀取 CI 檔案 (Sprint.txt)，這部分維持不變，假設格式為 CSV"""
+        """Reads CI files (Sprint.txt), assumes CSV format."""
         ci_history = {}
         ci_predict = {}
         num_servers = Config.NUM_EDGE_SERVERS
@@ -133,27 +132,27 @@ class DataLoader:
             data_dict = {}
             with open(path, 'r') as f:
                 lines = [l.strip() for l in f.readlines() if l.strip()]
-                # Edge Servers (前 N 行)
+                # Edge Servers (First N lines)
                 for i in range(num_servers):
                     if i < len(lines):
                         vals = list(map(float, lines[i].split(',')))
                         data_dict[f"Edge Server {i + 1}"] = vals
                 
                 # Cloud Servers
-                # 假設 Cloud 資料在 Edge 之後。如果只有一行，則共用。
-                # 如果有 N 行 Cloud，則一一對應。
+                # Assume Cloud data is after Edge. If only one line, share it.
+                # If N lines of Cloud, map one-to-one.
                 remaining_lines = len(lines) - num_servers
                 if remaining_lines >= num_servers:
                     for i in range(num_servers):
                         vals = list(map(float, lines[num_servers + i].split(',')))
                         data_dict[f"Cloud Server {i + 1}"] = vals
                 elif remaining_lines > 0:
-                    # 共用最後一行
+                    # Share the last line
                     vals = list(map(float, lines[-1].split(',')))
                     for i in range(num_servers):
                         data_dict[f"Cloud Server {i + 1}"] = vals
                 else:
-                    # 若無 Cloud 資料，複製 Edge 1 或生成預設
+                    # If no Cloud data, copy Edge 1 or generate default
                     print("Warning: No separate Cloud CI data found. Using Edge CI as fallback.")
                     for i in range(num_servers):
                          data_dict[f"Cloud Server {i + 1}"] = data_dict[f"Edge Server 1"]
