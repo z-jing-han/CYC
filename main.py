@@ -12,7 +12,7 @@ def run_simulation(algorithm='DWPA'):
     data_loader = DataLoader()
     env = CloudEdgeEnvironment(data_loader)
     
-    # Get total steps (read from file)
+    # Get total steps
     total_steps = env.max_time_steps
     print(f"Total Time Slots for this round: {total_steps}")
     
@@ -22,23 +22,21 @@ def run_simulation(algorithm='DWPA'):
     
     if algorithm == 'DWPA':
         solver = DWPASolver(env)
-    elif algorithm == 'MARL': # Random
+    elif algorithm == 'MARL': 
         agents = [RandomAgent(i, Config.NUM_EDGE_SERVERS) for i in range(Config.NUM_EDGE_SERVERS)]
         marl_controller = MARLController(env, agents)
     elif algorithm == 'QLearning':
-        # Added Q-Learning option
         agents = [QLearningAgent(i, Config.NUM_EDGE_SERVERS) for i in range(Config.NUM_EDGE_SERVERS)]
         marl_controller = MARLController(env, agents)
     else:
         raise ValueError(f"Unknown algorithm: {algorithm}")
     
-    # 3. Execution Loop (One Round)
+    # 3. Execution Loop (Single Round)
     state = env.reset()
     
     history_carbon = []
     history_q = []
     
-    # Use while loop with env's done signal
     done = False
     step_count = 0
     
@@ -54,22 +52,19 @@ def run_simulation(algorithm='DWPA'):
         
         # Training Step (For RL Algorithms)
         if algorithm == 'QLearning':
-            # Calculate Reward
-            # Simple Reward: -(Weight * Carbon + Queue)
-            # Normalize or scale to keep values reasonable
+            # Reward: -(Weight * Carbon + Queue)
             q_values = next_state['Q_edge']
             rewards = []
             for i in range(Config.NUM_EDGE_SERVERS):
-                # Individual Reward structure
                 r = - (0.1 * carbon / Config.NUM_EDGE_SERVERS + 1e-6 * q_values[i])
                 rewards.append(r)
             
             marl_controller.update_agents(state, decisions, rewards, next_state)
         
         history_carbon.append(carbon)
-        history_q.append(info['q_avg_total']) # Use total Queue for fairness
+        history_q.append(info['q_avg_total']) 
         
-        # Log (Print every 50 steps to avoid spam)
+        # Log
         if step_count % 50 == 0 or step_count == total_steps - 1:
              print(f"Step {step_count:04d}: C={carbon:.4f}, Q_sys={info['q_avg_total']/1e6:.2f}Mb "
                    f"(Loc:{info['processed_local']/1e6:.2f}, Cld:{info['processed_cloud']/1e6:.2f}, OffC:{info['offloaded_cloud']/1e6:.2f})")
@@ -92,7 +87,7 @@ if __name__ == "__main__":
     c_ql, q_ql = run_simulation('QLearning')
     
     print("\n" + "="*30)
-    print("=== FINAL COMPARISON (1 ROUND) ===")
+    print("=== FINAL COMPARISON ===")
     print("="*30)
     print(f"DWPA      | Carbon: {c_dwpa:10.4f} | Avg Queue: {q_dwpa/1e6:10.2f} Mb")
     print(f"MARL(Rnd) | Carbon: {c_marl:10.4f} | Avg Queue: {q_marl/1e6:10.2f} Mb")

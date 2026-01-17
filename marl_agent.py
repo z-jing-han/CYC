@@ -103,18 +103,13 @@ class QLearningAgent:
         else:
             action_idx = np.argmax(self.q_table[state_key])
             
-        # Store last action for learning update (if needed externally, though typically passed in loop)
+        # Store last action for learning update
         self.last_action = action_idx
         self.last_state = state_key
             
         return self._get_ratios_from_action(action_idx)
 
     def learn(self, state, ratios_action, reward, next_state):
-        """
-        Update Q-Table
-        Note: 'ratios_action' is what the environment received. 
-        We rely on self.last_action to know which discrete choice was made.
-        """
         state_key = self.last_state
         next_state_key = self._discretize_state(next_state)
         action_idx = self.last_action
@@ -122,8 +117,6 @@ class QLearningAgent:
         if next_state_key not in self.q_table:
             self.q_table[next_state_key] = np.zeros(self.num_actions)
             
-        # Q-Learning Update Rule
-        # Q(s,a) = Q(s,a) + lr * (R + gamma * max(Q(s',a')) - Q(s,a))
         best_next_q = np.max(self.q_table[next_state_key])
         current_q = self.q_table[state_key][action_idx]
         
@@ -141,49 +134,36 @@ class MARLController:
         self.num_edge = Config.NUM_EDGE_SERVERS
 
     def get_decisions(self, state):
-        """
-        Convert Agent ratio decisions to physical quantities:
-        - f_edge (CPU frequency)
-        - x_peer, x_cloud (Offloading bits)
-        - p_peer, p_cloud (Transmission power)
-        """
         f_edge = np.zeros(self.num_edge)
         x_peer = np.zeros((self.num_edge, self.num_edge))
         p_peer = np.zeros((self.num_edge, self.num_edge))
         x_cloud = np.zeros(self.num_edge)
         p_cloud = np.zeros(self.num_edge)
-        f_cloud = np.zeros(self.num_edge) # Cloud CPU frequency for each edge user
+        f_cloud = np.zeros(self.num_edge) 
         
         Q_edge = state['Q_edge']
         
         for i in range(self.num_edge):
             agent = self.agents[i]
-            # Pass state to agent (Required for RL Agents)
             probs = agent.get_action(state)
             
-            # Parse ratios
             ratio_local = probs[0]
             ratio_cloud = probs[1]
-            ratio_peers = probs[2:] # List of (N-1) peers
+            ratio_peers = probs[2:] 
             
-            # 1. Local Frequency Computation
-            # Strategy: Occupy CPU capacity proportional to assigned local ratio
+            # 1. Local Frequency
             f_edge[i] = Config.EDGE_F_MAX * ratio_local
             
-            # Current Queue Load
             task_load = Q_edge[i]
             
             # 2. Cloud Offloading
             x_cloud[i] = task_load * ratio_cloud
             if x_cloud[i] > 1e-3:
-                # If decided to transmit, assume max power
                 p_cloud[i] = Config.EDGE_P_MAX 
-                # [BUG FIX] Must set Cloud frequency, otherwise Cloud energy is 0
-                # Assume Cloud runs at standard Edge frequency or faster
-                f_cloud[i] = Config.EDGE_F_MAX 
+                # [FIX] Use CLOUD_F_MAX for Cloud Processing
+                f_cloud[i] = Config.CLOUD_F_MAX 
             
             # 3. Peer Offloading
-            # Find neighbor indices (excluding self)
             peer_indices = [k for k in range(self.num_edge) if k != i]
             
             for idx, neighbor_id in enumerate(peer_indices):
@@ -204,14 +184,6 @@ class MARLController:
         }
 
     def update_agents(self, state, decisions, rewards, next_state):
-        """
-        Trigger learning for all agents.
-        """
         for i in range(self.num_edge):
             agent = self.agents[i]
-            # RandomAgent might assume decisions are passed differently, 
-            # but QLearningAgent needs the specific logic handled internally or here.
-            # Here we just pass the signal to learn.
-            # Note: 'decisions' here contains the physical values, not the ratios.
-            # Ideally, agents stored their last action internally.
             agent.learn(state, None, rewards[i], next_state)

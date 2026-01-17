@@ -10,32 +10,49 @@ class Config:
 
     # --- System Parameters ---
     NUM_EDGE_SERVERS = 5       
-    NUM_CLOUD_SERVERS = 5      # In DCWA code, Cloud count equals Edge count (one-to-one mapping logic)
-    TIME_SLOT_DURATION = 1.0   
+    NUM_CLOUD_SERVERS = 5      
+    TIME_SLOT_DURATION = 1.0   # Unit: seconds (s)
     
-    # --- Physical Parameters (Based on DCWA.py original settings) ---
+    # --- Physical Parameters ---
+    # Frequency limit
     EDGE_F_MAX = 1e9           # 1 GHz
-    EDGE_P_MAX = 1e9           # Max transmission power
+    # [FIX] Added Cloud Frequency Limit from Paper (80 GHz)
+    # Without this, Cloud is capped at 1GHz, causing queue buildup.
+    CLOUD_F_MAX = 8e10         # 80 GHz 
+    
+    # Power limit: 1 Watt
+    EDGE_P_MAX = 1.0           # Unit: Watts (W)
     
     # Computational Intensity
-    PHI = 1000.0               # Cycles per bit (cpu_cycles_per_bit)
-    ZETA = 1e-18               # Effective Capacitance
+    PHI = 1000.0               # Unit: cycles/bit (CPU cycles required per bit)
     
-    # Communication Parameters
-    BANDWIDTH = 10e6           # 10 MHz
-    NOISE_POWER = 130          # N0
-    G_IJ = 1e-8                # Channel Gain Edge-Edge
-    G_IC = 1e-8                # Channel Gain Edge-Cloud
+    # Effective Capacitance (ZETA)
+    # [FIX] Corrected ZETA for physical realism (Watts ~ 1-10 range)
+    # 1e-18 with 1e9^3 Hz gives 1e9 Watts. 1e-28 gives ~1 Watt.
+    ZETA = 1e-28               # Unit: Effective Capacitance coefficient
     
-    # --- Key Correction: Energy Emission Constants (Source: DCWA.py) ---
-    # Constants used in DCWA.py; note that computation and transmission are different
-    CONST_EMISSION_COMPUTATION = 2.78 * 10**(-13) 
-    CONST_EMISSION_TRANSMISSION = 2.78 * 10**(-15)
+    # --- Communication Parameters ---
+    BANDWIDTH = 10e6           # Unit: Hz (10 MHz)
+    
+    # Noise Power
+    # [FIX] -130 dBm = 10^-16 W. -100 dBm = 10^-13 W.
+    # Using 1e-13 to ensure reasonable Shannon Capacity.
+    NOISE_POWER = 1e-13        # Unit: Watts (W)
+    
+    G_IJ = 1e-7                # Channel Gain Edge-Edge (Linear scale)
+    G_IC = 1e-7                # Channel Gain Edge-Cloud (Linear scale)
+    
+    # --- Energy Conversion Constants ---
+    # Energy (Joules) = Power (Watts) * Time (Seconds)
+    # Carbon (g) = Carbon Intensity (g/kWh) * Energy (kWh)
+    # 1 Joule = 2.77778e-7 kWh
+    CONST_JOULE_TO_KWH = 2.778e-7 
 
     # --- Lyapunov Optimization Parameters ---
-    V = 1.0                    # Weight control for Queue vs Carbon
+    # V: Control parameter for tradeoff between Queue and Carbon
+    # Larger V -> Less Carbon, Larger Queue
+    V = 1e9                    # Unit: Dimensionless weight factor (Updated to 1e9 to match DCWA.py)
     
     # --- Alpha Smoothing ---
-    # Hardcoded values from DCWA.py
-    ALPHAS = [0.88, 0.81, 0.95, 0.97, 0.9] # Corresponding to Edge 1-5
+    ALPHAS = [0.88, 0.81, 0.95, 0.97, 0.9] 
     ALPHA_CLOUD = 0.82
