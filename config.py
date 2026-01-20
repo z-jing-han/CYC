@@ -4,55 +4,61 @@ import os
 class Config:
     # --- File Path Settings ---
     BASE_DIR = os.getcwd()
-    CONFIG_FILE = 'InputData/DCWA-6-4-mb-0-2_1.txt' 
+    CONFIG_FILE = 'InputData/DCWA-6-4-mb-0-2_1.txt'
     HISTORY_FILE = 'InputData/Sprint.txt'
     PREDICT_FILE = 'InputData/Sprint_predict.txt'
 
     # --- System Parameters ---
-    NUM_EDGE_SERVERS = 5       
-    NUM_CLOUD_SERVERS = 5      
-    TIME_SLOT_DURATION = 1.0   # Unit: seconds (s)
+    NUM_EDGE_SERVERS = 5
+    NUM_CLOUD_SERVERS = 5
+    
+    # Time Slot Duration: paper p.6 "Each time slot was one hour."
+    TIME_SLOT_DURATION = 3600.0   # Unit: seconds (s)
     
     # --- Physical Parameters ---
-    # Frequency limit
-    EDGE_F_MAX = 1e9           # 1 GHz
-    # [FIX] Added Cloud Frequency Limit from Paper (80 GHz)
-    # Without this, Cloud is capped at 1GHz, causing queue buildup.
-    CLOUD_F_MAX = 8e10         # 80 GHz 
+    # paper p.39: fi_max = 10 GHz, fi_cmax = 80 GHz
+    EDGE_F_MAX = 10e9          # 10 GHz
+    CLOUD_F_MAX = 80e9         # 80 GHz
     
-    # Power limit: 1 Watt
+    # Power limit: paper p.39 pi_max = 1 W
     EDGE_P_MAX = 1.0           # Unit: Watts (W)
     
-    # Computational Intensity
-    PHI = 1000.0               # Unit: cycles/bit (CPU cycles required per bit)
+    # Computational Intensity: paper p.39 phi = 1000
+    PHI = 1000.0               # Unit: cycles/bit
     
     # Effective Capacitance (ZETA)
-    # [FIX] Corrected ZETA for physical realism (Watts ~ 1-10 range)
-    # 1e-18 with 1e9^3 Hz gives 1e9 Watts. 1e-28 gives ~1 Watt.
+    # paper p.39 xi = 10^-18 (It is usually MH Level Unit).
+    # If We consider Hz (10^9)，ZETA = 1e-28 should be a reason Watt Level Power
+    # Power = ZETA * f^3 = 1e-28 * (10^10)^3 = 1e-28 * 10^30 = 100 Watts
+    # [Check Again]
     ZETA = 1e-28               # Unit: Effective Capacitance coefficient
     
     # --- Communication Parameters ---
-    BANDWIDTH = 10e6           # Unit: Hz (10 MHz)
+    # paper p.39 Wi = 1 MHz
+    BANDWIDTH = 1e6            # Unit: Hz (1 MHz)
     
-    # Noise Power
-    # [FIX] -130 dBm = 10^-16 W. -100 dBm = 10^-13 W.
-    # Using 1e-13 to ensure reasonable Shannon Capacity.
-    NOISE_POWER = 1e-13        # Unit: Watts (W)
+    # Noise Power: paper p.39 N0 = -130 dBm
+    # -130 dBm = 10^(-130/10) mW = 10^-13 mW = 10^-16 W
+    NOISE_POWER = 1e-16        # Unit: Watts (W)
     
-    G_IJ = 1e-7                # Channel Gain Edge-Edge (Linear scale)
-    G_IC = 1e-7                # Channel Gain Edge-Cloud (Linear scale)
+    # Channel Gain
+    G_IJ = 1e-4                # Channel Gain Edge-Edge
+    G_IC = 1e-4                # Channel Gain Edge-Cloud
     
     # --- Energy Conversion Constants ---
-    # Energy (Joules) = Power (Watts) * Time (Seconds)
-    # Carbon (g) = Carbon Intensity (g/kWh) * Energy (kWh)
+    # Carbon (g) = Carbon Intensity (g/kWh) * Energy (J) * (kWh/J)
     # 1 Joule = 2.77778e-7 kWh
-    CONST_JOULE_TO_KWH = 2.778e-7 
+    CONST_JOULE_TO_KWH = 2.778e-7
 
     # --- Lyapunov Optimization Parameters ---
-    # V: Control parameter for tradeoff between Queue and Carbon
-    # Larger V -> Less Carbon, Larger Queue
-    V = 1e9                    # Unit: Dimensionless weight factor (Updated to 1e9 to match DCWA.py)
+    # V: Control parameter (Trade-off between Energy and Queue)
+    V = 1e12                   # Unit: Dimensionless weight factor
     
     # --- Alpha Smoothing ---
-    ALPHAS = [0.88, 0.81, 0.95, 0.97, 0.9] 
-    ALPHA_CLOUD = 0.82
+    ALPHAS = [0.86, 0.75, 0.95, 0.97, 0.65]
+    ALPHA_CLOUD = 0.93
+
+    # --- Data Unit Scaling ---
+    # 1 MB = 8 * 10^6 bits
+    DATA_SCALE_FACTOR = 8.0
+    MB_TO_BITS = 8 * 1e6

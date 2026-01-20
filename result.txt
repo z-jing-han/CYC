@@ -1,104 +1,107 @@
 
 === Starting Simulation with Algorithm: DWPA ===
+Logger initialized. Logs at: logs/log_DWPA_DCWA-6-4-mb-0-2_1.txt, Stats at: detailed_stats/stats_DWPA_DCWA-6-4-mb-0-2_1.csv
 Initializing data loader...
 Target Config File: InputData/DCWA-6-4-mb-0-2_1.txt
 Successfully loaded Config/Task data from InputData/DCWA-6-4-mb-0-2_1.txt
 Successfully loaded CI data from InputData/Sprint.txt and InputData/Sprint_predict.txt
 Total Time Slots for this round: 1000
-Step 0000: C=2.8872, Q_sys=6.41Mb (Loc:1.00, Cld:0.00, OffC:39.00)
-Step 0050: C=1.7708, Q_sys=25.15Mb (Loc:1.00, Cld:4.83, OffC:6.06)
-Step 0100: C=1.9011, Q_sys=25.14Mb (Loc:1.00, Cld:4.79, OffC:5.98)
-Step 0150: C=1.8886, Q_sys=25.15Mb (Loc:1.00, Cld:4.82, OffC:6.10)
-Step 0200: C=1.9283, Q_sys=25.11Mb (Loc:1.00, Cld:4.77, OffC:6.09)
-Step 0250: C=1.9596, Q_sys=25.23Mb (Loc:1.00, Cld:4.72, OffC:6.04)
-Step 0300: C=1.8830, Q_sys=25.13Mb (Loc:1.00, Cld:4.80, OffC:6.03)
-Step 0350: C=1.8991, Q_sys=25.25Mb (Loc:1.00, Cld:4.75, OffC:6.06)
-Step 0400: C=1.8812, Q_sys=25.21Mb (Loc:1.00, Cld:4.78, OffC:6.06)
-Step 0450: C=1.9087, Q_sys=25.15Mb (Loc:1.00, Cld:4.82, OffC:6.07)
-Step 0500: C=1.7946, Q_sys=25.11Mb (Loc:1.00, Cld:4.79, OffC:6.00)
-Step 0550: C=1.8382, Q_sys=25.22Mb (Loc:1.00, Cld:4.82, OffC:6.04)
-Step 0600: C=1.8180, Q_sys=25.17Mb (Loc:1.00, Cld:4.74, OffC:6.07)
-Step 0650: C=1.7786, Q_sys=25.14Mb (Loc:1.00, Cld:4.80, OffC:6.02)
-Step 0700: C=1.8322, Q_sys=25.22Mb (Loc:1.00, Cld:4.82, OffC:6.07)
-Step 0750: C=1.8861, Q_sys=25.17Mb (Loc:1.00, Cld:4.75, OffC:6.04)
-Step 0800: C=1.8837, Q_sys=25.19Mb (Loc:1.00, Cld:4.76, OffC:6.04)
-Step 0850: C=1.9457, Q_sys=25.17Mb (Loc:1.00, Cld:4.74, OffC:6.03)
-Step 0900: C=2.0120, Q_sys=25.24Mb (Loc:1.00, Cld:4.77, OffC:6.03)
-Step 0950: C=2.0101, Q_sys=25.23Mb (Loc:1.00, Cld:4.72, OffC:6.00)
-Step 0999: C=1.2852, Q_sys=25.78Mb (Loc:1.00, Cld:6.01, OffC:4.75)
+Step 0000: C=0.0000 g, Q_sys=6.41 MB (Loc:5.00 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0050: C=0.0000 g, Q_sys=6.36 MB (Loc:6.39 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0100: C=0.0000 g, Q_sys=6.36 MB (Loc:6.33 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0150: C=0.0000 g, Q_sys=6.38 MB (Loc:6.40 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0200: C=0.0000 g, Q_sys=6.32 MB (Loc:6.46 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0250: C=0.0000 g, Q_sys=6.45 MB (Loc:6.43 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0300: C=0.0000 g, Q_sys=6.38 MB (Loc:6.35 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0350: C=0.0000 g, Q_sys=6.43 MB (Loc:6.40 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0400: C=0.0000 g, Q_sys=6.45 MB (Loc:6.41 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0450: C=0.0000 g, Q_sys=6.40 MB (Loc:6.46 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0500: C=0.0000 g, Q_sys=6.36 MB (Loc:6.40 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0550: C=0.0000 g, Q_sys=6.41 MB (Loc:6.42 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0600: C=0.0000 g, Q_sys=6.38 MB (Loc:6.42 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0650: C=0.0000 g, Q_sys=6.38 MB (Loc:6.35 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0700: C=0.0000 g, Q_sys=6.38 MB (Loc:6.44 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0750: C=0.0000 g, Q_sys=6.44 MB (Loc:6.41 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0800: C=0.0000 g, Q_sys=6.37 MB (Loc:6.38 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0850: C=0.0000 g, Q_sys=6.39 MB (Loc:6.37 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0900: C=0.0000 g, Q_sys=6.41 MB (Loc:6.38 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0950: C=0.0000 g, Q_sys=6.45 MB (Loc:6.38 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0999: C=0.0000 g, Q_sys=6.37 MB (Loc:6.37 MB, Cld:0.00 MB, OffC:0.00 MB)
 
 >>> Simulation Finished (DWPA) <<<
-Total Carbon: 1585.1507
-Avg System Queue: 25384633.90
+Total Carbon: 0.0005 g
+Avg System Queue: 6.40 MB
 
 === Starting Simulation with Algorithm: MARL ===
+Logger initialized. Logs at: logs/log_MARL_DCWA-6-4-mb-0-2_1.txt, Stats at: detailed_stats/stats_MARL_DCWA-6-4-mb-0-2_1.csv
 Initializing data loader...
 Target Config File: InputData/DCWA-6-4-mb-0-2_1.txt
 Successfully loaded Config/Task data from InputData/DCWA-6-4-mb-0-2_1.txt
 Successfully loaded CI data from InputData/Sprint.txt and InputData/Sprint_predict.txt
 Total Time Slots for this round: 1000
-Step 0000: C=48.2923, Q_sys=39.01Mb (Loc:0.23, Cld:0.00, OffC:7.17)
-Step 0050: C=51.0504, Q_sys=42.06Mb (Loc:0.14, Cld:5.44, OffC:7.32)
-Step 0100: C=44.1726, Q_sys=36.03Mb (Loc:0.10, Cld:9.02, OffC:4.75)
-Step 0150: C=44.7762, Q_sys=36.49Mb (Loc:0.15, Cld:4.83, OffC:7.21)
-Step 0200: C=42.8973, Q_sys=35.50Mb (Loc:0.12, Cld:3.15, OffC:8.78)
-Step 0250: C=41.4905, Q_sys=36.69Mb (Loc:0.23, Cld:8.39, OffC:3.36)
-Step 0300: C=45.0503, Q_sys=32.80Mb (Loc:0.08, Cld:5.35, OffC:7.26)
-Step 0350: C=44.2139, Q_sys=37.27Mb (Loc:0.23, Cld:5.39, OffC:6.97)
-Step 0400: C=45.1034, Q_sys=36.28Mb (Loc:0.14, Cld:7.38, OffC:5.16)
-Step 0450: C=43.8263, Q_sys=35.57Mb (Loc:0.13, Cld:9.78, OffC:8.25)
-Step 0500: C=49.6244, Q_sys=42.52Mb (Loc:0.19, Cld:7.35, OffC:6.72)
-Step 0550: C=47.2982, Q_sys=45.85Mb (Loc:0.22, Cld:7.40, OffC:5.91)
-Step 0600: C=48.2837, Q_sys=40.00Mb (Loc:0.23, Cld:5.89, OffC:7.36)
-Step 0650: C=50.5582, Q_sys=34.51Mb (Loc:0.17, Cld:5.79, OffC:4.88)
-Step 0700: C=47.6196, Q_sys=39.04Mb (Loc:0.11, Cld:5.52, OffC:5.37)
-Step 0750: C=44.8318, Q_sys=35.71Mb (Loc:0.10, Cld:9.13, OffC:11.32)
-Step 0800: C=44.9527, Q_sys=36.14Mb (Loc:0.23, Cld:5.07, OffC:6.26)
-Step 0850: C=42.0983, Q_sys=39.48Mb (Loc:0.14, Cld:5.46, OffC:3.14)
-Step 0900: C=39.4146, Q_sys=41.75Mb (Loc:0.24, Cld:4.14, OffC:7.14)
-Step 0950: C=39.4285, Q_sys=34.52Mb (Loc:0.12, Cld:6.86, OffC:7.21)
-Step 0999: C=45.4776, Q_sys=39.11Mb (Loc:0.17, Cld:5.70, OffC:6.00)
+Step 0000: C=0.0004 g, Q_sys=6.41 MB (Loc:5.00 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0050: C=0.0006 g, Q_sys=6.36 MB (Loc:6.39 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0100: C=0.0006 g, Q_sys=6.36 MB (Loc:6.33 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0150: C=0.0006 g, Q_sys=6.38 MB (Loc:6.40 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0200: C=0.0006 g, Q_sys=6.32 MB (Loc:6.46 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0250: C=0.0005 g, Q_sys=6.45 MB (Loc:6.43 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0300: C=0.0006 g, Q_sys=6.38 MB (Loc:6.35 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0350: C=0.0006 g, Q_sys=6.43 MB (Loc:6.53 MB, Cld:0.03 MB, OffC:0.00 MB)
+Step 0400: C=0.0005 g, Q_sys=6.45 MB (Loc:6.41 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0450: C=0.0005 g, Q_sys=6.40 MB (Loc:6.46 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0500: C=0.0005 g, Q_sys=6.36 MB (Loc:6.40 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0550: C=0.0006 g, Q_sys=6.41 MB (Loc:6.42 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0600: C=0.0006 g, Q_sys=6.38 MB (Loc:6.42 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0650: C=0.0005 g, Q_sys=6.38 MB (Loc:6.35 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0700: C=0.0005 g, Q_sys=6.38 MB (Loc:6.44 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0750: C=0.0006 g, Q_sys=6.44 MB (Loc:6.41 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0800: C=0.0006 g, Q_sys=6.37 MB (Loc:6.38 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0850: C=0.0006 g, Q_sys=6.39 MB (Loc:6.37 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0900: C=0.0007 g, Q_sys=6.41 MB (Loc:6.38 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0950: C=0.0007 g, Q_sys=6.45 MB (Loc:6.38 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0999: C=0.0005 g, Q_sys=6.37 MB (Loc:6.37 MB, Cld:0.00 MB, OffC:0.00 MB)
 
 >>> Simulation Finished (MARL) <<<
-Total Carbon: 45383.1206
-Avg System Queue: 37603608.39
+Total Carbon: 0.5689 g
+Avg System Queue: 6.41 MB
 
 === Starting Simulation with Algorithm: QLearning ===
+Logger initialized. Logs at: logs/log_QLearning_DCWA-6-4-mb-0-2_1.txt, Stats at: detailed_stats/stats_QLearning_DCWA-6-4-mb-0-2_1.csv
 Initializing data loader...
 Target Config File: InputData/DCWA-6-4-mb-0-2_1.txt
 Successfully loaded Config/Task data from InputData/DCWA-6-4-mb-0-2_1.txt
 Successfully loaded CI data from InputData/Sprint.txt and InputData/Sprint_predict.txt
 Total Time Slots for this round: 1000
-Step 0000: C=0.0001, Q_sys=45.61Mb (Loc:0.80, Cld:0.00, OffC:0.00)
-Step 0050: C=10.2098, Q_sys=181.33Mb (Loc:0.90, Cld:16.00, OffC:24.75)
-Step 0100: C=0.0001, Q_sys=333.60Mb (Loc:1.00, Cld:0.00, OffC:0.00)
-Step 0150: C=8.9549, Q_sys=304.54Mb (Loc:0.80, Cld:16.00, OffC:2.34)
-Step 0200: C=0.0001, Q_sys=283.05Mb (Loc:1.00, Cld:0.00, OffC:0.00)
-Step 0250: C=0.0000, Q_sys=376.72Mb (Loc:1.00, Cld:0.00, OffC:0.00)
-Step 0300: C=9.0098, Q_sys=494.33Mb (Loc:0.70, Cld:16.00, OffC:1.19)
-Step 0350: C=0.0001, Q_sys=634.14Mb (Loc:1.00, Cld:0.00, OffC:0.00)
-Step 0400: C=9.0202, Q_sys=488.25Mb (Loc:0.80, Cld:16.00, OffC:39.86)
-Step 0450: C=8.7649, Q_sys=433.08Mb (Loc:0.80, Cld:16.00, OffC:3.48)
-Step 0500: C=0.0001, Q_sys=417.45Mb (Loc:0.80, Cld:0.00, OffC:0.00)
-Step 0550: C=0.0001, Q_sys=280.36Mb (Loc:1.00, Cld:0.00, OffC:0.00)
-Step 0600: C=0.0000, Q_sys=444.09Mb (Loc:1.00, Cld:0.00, OffC:0.00)
-Step 0650: C=0.0001, Q_sys=621.96Mb (Loc:1.00, Cld:0.00, OffC:0.00)
-Step 0700: C=0.0001, Q_sys=707.92Mb (Loc:1.00, Cld:0.00, OffC:0.00)
-Step 0750: C=0.0001, Q_sys=745.28Mb (Loc:1.00, Cld:0.00, OffC:0.00)
-Step 0800: C=0.0001, Q_sys=704.23Mb (Loc:1.00, Cld:0.00, OffC:0.00)
-Step 0850: C=0.0002, Q_sys=699.29Mb (Loc:0.80, Cld:0.00, OffC:0.00)
-Step 0900: C=0.0001, Q_sys=454.98Mb (Loc:1.00, Cld:0.00, OffC:0.00)
-Step 0950: C=0.0001, Q_sys=617.75Mb (Loc:1.00, Cld:0.00, OffC:0.00)
-Step 0999: C=18.1902, Q_sys=534.40Mb (Loc:0.70, Cld:32.00, OffC:61.21)
+Step 0000: C=0.0000 g, Q_sys=6.41 MB (Loc:5.00 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0050: C=0.0000 g, Q_sys=6.36 MB (Loc:6.39 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0100: C=0.0000 g, Q_sys=6.36 MB (Loc:6.33 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0150: C=0.0000 g, Q_sys=6.38 MB (Loc:6.40 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0200: C=0.0001 g, Q_sys=6.32 MB (Loc:5.17 MB, Cld:1.27 MB, OffC:1.30 MB)
+Step 0250: C=0.0000 g, Q_sys=6.45 MB (Loc:6.43 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0300: C=0.0004 g, Q_sys=7.64 MB (Loc:2.55 MB, Cld:2.56 MB, OffC:2.54 MB)
+Step 0350: C=0.0001 g, Q_sys=6.43 MB (Loc:6.40 MB, Cld:1.28 MB, OffC:0.00 MB)
+Step 0400: C=0.0000 g, Q_sys=6.45 MB (Loc:6.41 MB, Cld:1.29 MB, OffC:0.00 MB)
+Step 0450: C=0.0001 g, Q_sys=7.70 MB (Loc:5.16 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0500: C=0.0000 g, Q_sys=6.36 MB (Loc:6.40 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0550: C=0.0001 g, Q_sys=7.68 MB (Loc:5.15 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0600: C=0.0000 g, Q_sys=6.38 MB (Loc:6.42 MB, Cld:1.26 MB, OffC:0.00 MB)
+Step 0650: C=0.0001 g, Q_sys=6.38 MB (Loc:6.35 MB, Cld:2.54 MB, OffC:0.00 MB)
+Step 0700: C=0.0001 g, Q_sys=6.38 MB (Loc:6.43 MB, Cld:0.00 MB, OffC:1.28 MB)
+Step 0750: C=0.0004 g, Q_sys=9.01 MB (Loc:5.12 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0800: C=0.0001 g, Q_sys=6.37 MB (Loc:5.09 MB, Cld:1.28 MB, OffC:1.29 MB)
+Step 0850: C=0.0001 g, Q_sys=7.66 MB (Loc:6.37 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0900: C=0.0000 g, Q_sys=6.41 MB (Loc:7.66 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0950: C=0.0002 g, Q_sys=9.02 MB (Loc:3.80 MB, Cld:0.00 MB, OffC:0.00 MB)
+Step 0999: C=0.0003 g, Q_sys=6.37 MB (Loc:5.08 MB, Cld:1.26 MB, OffC:1.29 MB)
 
 >>> Simulation Finished (QLearning) <<<
-Total Carbon: 1610.7770
-Avg System Queue: 487412158.75
+Total Carbon: 0.1756 g
+Avg System Queue: 6.90 MB
 
-==============================
-=== FINAL COMPARISON ===
-==============================
-DWPA      | Carbon:  1585.1507 | Avg Queue:      25.38 Mb
-MARL(Rnd) | Carbon: 45383.1206 | Avg Queue:      37.60 Mb
-QLearning | Carbon:  1610.7770 | Avg Queue:     487.41 Mb
-==============================
+========================================
+=== FINAL COMPARISON (單位: g, MB) ===
+========================================
+DWPA      | Carbon:     0.0005 g | Avg Queue:       6.40 MB
+MARL(Rnd) | Carbon:     0.5689 g | Avg Queue:       6.41 MB
+QLearning | Carbon:     0.1756 g | Avg Queue:       6.90 MB
+========================================

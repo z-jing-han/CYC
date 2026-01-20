@@ -4,19 +4,22 @@ from data_loader import DataLoader
 from marl_env import CloudEdgeEnvironment
 from dwpa_solver import DWPASolver
 from marl_agent import RandomAgent, QLearningAgent, MARLController
+from logger_utils import SimulationLogger
 
 def run_simulation(algorithm='DWPA'):
     print(f"\n=== Starting Simulation with Algorithm: {algorithm} ===")
     
-    # 1. Initialize Data and Environment
-    data_loader = DataLoader()
-    env = CloudEdgeEnvironment(data_loader)
+    # 1. Initialize Logger
+    logger = SimulationLogger(algorithm, Config.CONFIG_FILE)
     
-    # Get total steps
+    # 2. Initialize Data and Environment
+    data_loader = DataLoader()
+    env = CloudEdgeEnvironment(data_loader, logger=logger, enable_dvfs=True)
+    
     total_steps = env.max_time_steps
     print(f"Total Time Slots for this round: {total_steps}")
     
-    # 2. Initialize Controller / Solver
+    # 3. Initialize Controller / Solver
     solver = None
     marl_controller = None
     
@@ -31,7 +34,7 @@ def run_simulation(algorithm='DWPA'):
     else:
         raise ValueError(f"Unknown algorithm: {algorithm}")
     
-    # 3. Execution Loop (Single Round)
+    # 4. Execution Loop
     state = env.reset()
     
     history_carbon = []
@@ -40,6 +43,8 @@ def run_simulation(algorithm='DWPA'):
     done = False
     step_count = 0
     
+    TO_MB = 1.0 / Config.MB_TO_BITS
+    
     while not done:
         # Get Decisions
         if algorithm == 'DWPA':
@@ -47,12 +52,11 @@ def run_simulation(algorithm='DWPA'):
         else: # MARL or QLearning
             decisions = marl_controller.get_decisions(state)
             
-        # Environment Step
+        # Environment Step (Logging happens inside here now)
         next_state, carbon, done, info = env.step(decisions)
         
-        # Training Step (For RL Algorithms)
+        # Training Step
         if algorithm == 'QLearning':
-            # Reward: -(Weight * Carbon + Queue)
             q_values = next_state['Q_edge']
             rewards = []
             for i in range(Config.NUM_EDGE_SERVERS):
@@ -64,10 +68,10 @@ def run_simulation(algorithm='DWPA'):
         history_carbon.append(carbon)
         history_q.append(info['q_avg_total']) 
         
-        # Log
+        # Terminal Output (with units)
         if step_count % 50 == 0 or step_count == total_steps - 1:
-             print(f"Step {step_count:04d}: C={carbon:.4f}, Q_sys={info['q_avg_total']/1e6:.2f}Mb "
-                   f"(Loc:{info['processed_local']/1e6:.2f}, Cld:{info['processed_cloud']/1e6:.2f}, OffC:{info['offloaded_cloud']/1e6:.2f})")
+             print(f"Step {step_count:04d}: C={carbon:.4f} g, Q_sys={info['q_avg_total']*TO_MB:.2f} MB "
+                   f"(Loc:{info['processed_local']*TO_MB:.2f} MB, Cld:{info['processed_cloud']*TO_MB:.2f} MB, OffC:{info['offloaded_cloud']*TO_MB:.2f} MB)")
         
         state = next_state
         step_count += 1
@@ -75,9 +79,11 @@ def run_simulation(algorithm='DWPA'):
     total_carbon = sum(history_carbon)
     avg_q = np.mean(history_q)
     
+    logger.close()
+    
     print(f"\n>>> Simulation Finished ({algorithm}) <<<")
-    print(f"Total Carbon: {total_carbon:.4f}")
-    print(f"Avg System Queue: {avg_q:.2f}")
+    print(f"Total Carbon: {total_carbon:.4f} g")
+    print(f"Avg System Queue: {avg_q*TO_MB:.2f} MB")
     
     return total_carbon, avg_q
 
@@ -86,10 +92,12 @@ if __name__ == "__main__":
     c_marl, q_marl = run_simulation('MARL')
     c_ql, q_ql = run_simulation('QLearning')
     
-    print("\n" + "="*30)
-    print("=== FINAL COMPARISON ===")
-    print("="*30)
-    print(f"DWPA      | Carbon: {c_dwpa:10.4f} | Avg Queue: {q_dwpa/1e6:10.2f} Mb")
-    print(f"MARL(Rnd) | Carbon: {c_marl:10.4f} | Avg Queue: {q_marl/1e6:10.2f} Mb")
-    print(f"QLearning | Carbon: {c_ql:10.4f} | Avg Queue: {q_ql/1e6:10.2f} Mb")
-    print("="*30)
+    TO_MB = 1.0 / Config.MB_TO_BITS
+    
+    print("\n" + "="*40)
+    print("=== FINAL COMPARISON (單位: g, MB) ===")
+    print("="*40)
+    print(f"DWPA      | Carbon: {c_dwpa:10.4f} g | Avg Queue: {q_dwpa*TO_MB:10.2f} MB")
+    print(f"MARL(Rnd) | Carbon: {c_marl:10.4f} g | Avg Queue: {q_marl*TO_MB:10.2f} MB")
+    print(f"QLearning | Carbon: {c_ql:10.4f} g | Avg Queue: {q_ql*TO_MB:10.2f} MB")
+    print("="*40)
