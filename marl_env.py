@@ -19,6 +19,7 @@ class CloudEdgeEnvironment:
         self.queues_edge = np.zeros(self.num_edge)
         self.queues_cloud = np.zeros(self.num_edge) 
         
+        # State placeholders
         self.ci_hist_state = np.zeros((self.num_edge, 2)) 
         self.ci_pred_state = np.zeros((self.num_edge, 2))
         self.ci_cloud_hist_state = np.zeros((self.num_edge, 2))
@@ -29,14 +30,6 @@ class CloudEdgeEnvironment:
         # Reset Queues: 5 MB Initial
         self.queues_edge.fill(5.0 * Config.MB_TO_BITS) 
         self.queues_cloud.fill(0)
-        
-        for i in range(self.num_edge):
-            edge_name = f"Edge Server {i+1}"
-            if edge_name in self.ci_hist_raw:
-                val = self.ci_hist_raw[edge_name][0]
-                self.ci_hist_state[i] = [val, val]
-                val_pred = self.ci_pred_raw[edge_name][0]
-                self.ci_pred_state[i] = [val_pred, val_pred]
         
         return self._get_state()
 
@@ -76,11 +69,35 @@ class CloudEdgeEnvironment:
     def compute_transmission_rate(self, p_tx, is_cloud=False):
         gain = Config.G_IC if is_cloud else Config.G_IJ
         # Shannon Capacity: W * log2(1 + S/N)
+        # R = W * log2(1 + g*p / N0)
         snr = 0 if Config.NOISE_POWER <= 0 else (p_tx * gain) / Config.NOISE_POWER
         rate = Config.BANDWIDTH * np.log2(1 + snr)
         return rate
 
     def step(self, decisions):
+        """
+        Executes one time slot with the Serial Transmission -> Computation logic.
+        Ref: 
+        1. Transmit to Cloud/Peer (Serial). T_off = x / R.
+        2. Compute with remaining time. T_cmp = T_slot - sum(T_off).
+        3. Update Queue and Carbon.
+        """
+        
+        # 1. Extract Decisions
+        f_edge = decisions['f_edge'].copy()
+        x_peer = decisions['x_peer'].copy()
+        p_peer = decisions['p_peer'].copy()
+        x_cloud = decisions['x_cloud'].copy()
+        p_cloud = decisions['p_cloud'].copy() 
+        f_cloud = decisions.get('f_cloud', np.zeros(self.num_edge)).copy()
+
+        # 2. Get Environment State
+        state = self._get_state()
+        ci_edge = state['CI_edge']
+        ci_cloud = state['CI_cloud']
+        arrival = state['Arrival']
+        
+        # Initialize Metrics
         m_edge_proc_local = np.zeros(self.num_edge)
         m_edge_tx_peer = np.zeros(self.num_edge)
         m_edge_tx_cloud = np.zeros(self.num_edge)
@@ -95,161 +112,198 @@ class CloudEdgeEnvironment:
         m_cloud_carbon = np.zeros(self.num_edge)
         m_cloud_q_pre = self.queues_cloud.copy()
 
-        f_edge = decisions['f_edge'].copy()
-        x_peer = decisions['x_peer']
-        p_peer = decisions['p_peer']
-        x_cloud = decisions['x_cloud']
-        p_cloud = decisions['p_cloud'] 
-        f_cloud = decisions.get('f_cloud', np.zeros(self.num_edge)).copy()
-
-        # --- DVFS Logic ---
-        if self.enable_dvfs:
-            for i in range(self.num_edge):
-                # Edge
-                capacity_local = (f_edge[i] / Config.PHI) * Config.TIME_SLOT_DURATION
-                actual_load_local = min(self.queues_edge[i], capacity_local)
-                if actual_load_local > 0:
-                    f_needed = (actual_load_local * Config.PHI) / Config.TIME_SLOT_DURATION
-                    f_edge[i] = min(f_edge[i], f_needed)
-                else:
-                    f_edge[i] = 0
-                
-                # Cloud
-                capacity_cloud = (f_cloud[i] / Config.PHI) * Config.TIME_SLOT_DURATION
-                actual_load_cloud = min(self.queues_cloud[i], capacity_cloud)
-                if actual_load_cloud > 0:
-                    f_c_needed = (actual_load_cloud * Config.PHI) / Config.TIME_SLOT_DURATION
-                    f_cloud[i] = min(f_cloud[i], f_c_needed)
-                else:
-                    f_cloud[i] = 0
-
-        state = self._get_state()
-        ci_edge = state['CI_edge']
-        ci_cloud = state['CI_cloud']
-        arrival = state['Arrival']
-        
         total_carbon = 0.0
         
-        # --- 1. Process Local Tasks ---
-        capacity_local = (f_edge / Config.PHI) * Config.TIME_SLOT_DURATION
-        # Cannot exceed the Queue len
-        bits_processed_local = np.minimum(self.queues_edge, capacity_local)
-        
-        for i in range(self.num_edge):
-            m_edge_proc_local[i] = bits_processed_local[i]
-            
-            if f_edge[i] > 1e-6:
-                processing_rate = f_edge[i] / Config.PHI
-                # Time = Work / Rate
-                time_active = bits_processed_local[i] / processing_rate
-                time_active = min(time_active, Config.TIME_SLOT_DURATION)
-                
-                # Energy = xi * f^3 * t
-                energy_joules = (f_edge[i]**3) * Config.ZETA * time_active
-                m_edge_energy_comp[i] = energy_joules
-                
-                c_val = ci_edge[i] * energy_joules * Config.CONST_JOULE_TO_KWH
-                m_edge_carbon[i] += c_val
-                total_carbon += c_val
+        # Temporary arrays to hold actual executed values for queue update
+        actual_x_peer = np.zeros_like(x_peer)
+        actual_x_cloud = np.zeros_like(x_cloud)
+        actual_ec = np.zeros(self.num_edge)
 
-        # --- 2. Cloud Processing ---
-        capacity_cloud = (f_cloud / Config.PHI) * Config.TIME_SLOT_DURATION
-        bits_processed_cloud = np.minimum(self.queues_cloud, capacity_cloud)
-        
+        # =================================================================
+        # Phase 1: Edge Server - Serial Transmission First
+        # =================================================================
         for i in range(self.num_edge):
-            m_cloud_proc[i] = bits_processed_cloud[i]
+            # --- A. Validate & Limit by Current Queue ---
+            # You cannot transmit more than you have. 
+            # Logic: Priority to Offloading (as per "First transmit...")
+            current_q = self.queues_edge[i]
             
-            if f_cloud[i] > 1e-6:
-                processing_rate = f_cloud[i] / Config.PHI
-                time_active = bits_processed_cloud[i] / processing_rate
-                time_active = min(time_active, Config.TIME_SLOT_DURATION)
-                
-                energy_joules = (f_cloud[i]**3) * Config.ZETA * time_active
-                m_cloud_energy_comp[i] = energy_joules
-                
-                c_val = ci_cloud[i] * energy_joules * Config.CONST_JOULE_TO_KWH
-                m_cloud_carbon[i] = c_val
-                total_carbon += c_val
-
-        # --- 3. Transmission Physics ---
-        real_x_peer = np.zeros_like(x_peer)
-        
-        for i in range(self.num_edge):
+            # Calculate total requested offload
+            req_x_peer_sum = np.sum(x_peer[i])
+            req_x_cloud = x_cloud[i]
+            total_req_offload = req_x_peer_sum + req_x_cloud
+            
+            # Scale down if request > queue
+            scale_factor_q = 1.0
+            if total_req_offload > current_q:
+                scale_factor_q = current_q / (total_req_offload + 1e-9)
+            
+            # Apply Queue Constraint
+            valid_x_peer = x_peer[i] * scale_factor_q
+            valid_x_cloud = x_cloud[i] * scale_factor_q
+            
+            # --- B. Calculate Transmission Time & Check Time Constraint ---
+            t_needed_peer = np.zeros(self.num_edge)
+            t_needed_cloud = 0.0
+            
+            # Peer Transmissions
             for j in range(self.num_edge):
-                if i == j or x_peer[i, j] <= 0: continue
-                
-                if p_peer[i, j] > 0:
+                if i != j and valid_x_peer[j] > 1e-9 and p_peer[i, j] > 1e-9:
                     rate = self.compute_transmission_rate(p_peer[i, j], is_cloud=False)
-                    max_bits = rate * Config.TIME_SLOT_DURATION
-                    real_x_peer[i, j] = min(x_peer[i, j], max_bits)
-                    
-                    if rate > 0 and real_x_peer[i, j] > 0:
-                        time_tx = real_x_peer[i, j] / rate
-                        energy_joules = p_peer[i, j] * time_tx
-                        m_edge_energy_tx[i] += energy_joules
-                        
-                        c_val = ci_edge[i] * energy_joules * Config.CONST_JOULE_TO_KWH
-                        m_edge_carbon[i] += c_val
-                        total_carbon += c_val
-        
-        real_x_cloud = np.zeros_like(x_cloud)
-        for i in range(self.num_edge):
-            if x_cloud[i] > 0 and p_cloud[i] > 0:
-                rate = self.compute_transmission_rate(p_cloud[i], is_cloud=True)
-                max_bits = rate * Config.TIME_SLOT_DURATION
-                real_x_cloud[i] = min(x_cloud[i], max_bits)
-                
-                if rate > 0 and real_x_cloud[i] > 0:
-                    time_tx = real_x_cloud[i] / rate
-                    energy_joules = p_cloud[i] * time_tx
-                    m_edge_energy_tx[i] += energy_joules 
-                    
-                    c_val = ci_edge[i] * energy_joules * Config.CONST_JOULE_TO_KWH
-                    m_edge_carbon[i] += c_val
-                    total_carbon += c_val
+                    if rate > 1e-9:
+                        t_needed_peer[j] = valid_x_peer[j] / rate
+                    else:
+                        valid_x_peer[j] = 0 # Cannot transmit with 0 rate
+            
+            # Cloud Transmission
+            if valid_x_cloud > 1e-9 and p_cloud[i] > 1e-9:
+                rate_c = self.compute_transmission_rate(p_cloud[i], is_cloud=True)
+                if rate_c > 1e-9:
+                    t_needed_cloud = valid_x_cloud / rate_c
+                else:
+                    valid_x_cloud = 0
 
-        # --- 4. Queue Update ---
-        # 1. excluding local processing
-        self.queues_edge -= bits_processed_local
+            # Check Time Overflow
+            total_tx_time = np.sum(t_needed_peer) + t_needed_cloud
+            
+            scale_factor_time = 1.0
+            if total_tx_time > Config.TIME_SLOT_DURATION:
+                scale_factor_time = Config.TIME_SLOT_DURATION / (total_tx_time + 1e-9)
+            
+            # --- C. Finalize Transmission Values ---
+            # Apply time scaling
+            final_x_peer = valid_x_peer * scale_factor_time
+            final_x_cloud = valid_x_cloud * scale_factor_time
+            final_t_peer = t_needed_peer * scale_factor_time
+            final_t_cloud = t_needed_cloud * scale_factor_time
+            
+            # Store Actuals
+            actual_x_peer[i] = final_x_peer
+            actual_x_cloud[i] = final_x_cloud
+            m_edge_tx_peer[i] = np.sum(final_x_peer)
+            m_edge_tx_cloud[i] = final_x_cloud
+            
+            # --- D. Calculate Transmission Energy/Carbon ---
+            # U_off = k * p * T_off
+            # Peer Energy
+            for j in range(self.num_edge):
+                if final_t_peer[j] > 0:
+                    e_j = p_peer[i, j] * final_t_peer[j]
+                    m_edge_energy_tx[i] += e_j
+                    carb = ci_edge[i] * e_j * Config.CONST_JOULE_TO_KWH
+                    m_edge_carbon[i] += carb
+                    total_carbon += carb
+            
+            # Cloud Energy
+            if final_t_cloud > 0:
+                e_c = p_cloud[i] * final_t_cloud
+                m_edge_energy_tx[i] += e_c
+                carb = ci_edge[i] * e_c * Config.CONST_JOULE_TO_KWH
+                m_edge_carbon[i] += carb
+                total_carbon += carb
+
+            # =================================================================
+            # Phase 2: Edge Server - Computation (Remaining Time)
+            # =================================================================
+            # Time for computation
+            total_tx_time_final = np.sum(final_t_peer) + final_t_cloud
+            t_cmp = max(0, Config.TIME_SLOT_DURATION - total_tx_time_final)
+            
+            # Compute Capacity: EC_i = f * T_cmp / phi
+            ec_capacity = (f_edge[i] * t_cmp) / Config.PHI
+            
+            # Available data in queue (after transmission)
+            # Note: We already scaled x to fit in Q, so remaining >= 0
+            q_remaining = max(0, current_q - np.sum(final_x_peer) - final_x_cloud)
+            
+            # Actual Processed
+            processed_bits = min(q_remaining, ec_capacity)
+            actual_ec[i] = processed_bits
+            m_edge_proc_local[i] = processed_bits
+            
+            # Computation Energy
+            # Formula: U_i(t) := k_i * xi * f^3 * T_i^cmp
+            # NOTE: This formula implies energy is spent for the allocated time window T_cmp,
+            # regardless of whether the queue empties early. This is common in time-slotted models
+            # where the server is "on" for that duration.
+            if f_edge[i] > 0 and t_cmp > 0:
+                e_cmp = (f_edge[i]**3) * Config.ZETA * t_cmp
+                m_edge_energy_comp[i] += e_cmp
+                carb = ci_edge[i] * e_cmp * Config.CONST_JOULE_TO_KWH
+                m_edge_carbon[i] += carb
+                total_carbon += carb
         
-        # 2. excluding the offloaded portion (ensuring it does not become negative; i.e., the offloaded amount cannot exceed the current amount)
-        total_out_req = np.sum(real_x_peer, axis=1) + real_x_cloud
-        actual_out_ratio = np.ones(self.num_edge)
-        
-        # check for exceeding the available amount
-        mask = total_out_req > (self.queues_edge + 1e-9)
-        actual_out_ratio[mask] = self.queues_edge[mask] / (total_out_req[mask] + 1e-9)
-        
-        final_x_peer = real_x_peer * actual_out_ratio[:, np.newaxis]
-        final_x_cloud = real_x_cloud * actual_out_ratio
-        
-        # record the actual offloaded amount
+        # =================================================================
+        # Phase 3: Cloud Server Computation
+        # =================================================================
+        # Cloud uses full time slot
         for i in range(self.num_edge):
-            m_edge_tx_peer[i] = np.sum(final_x_peer[i])
-            m_edge_tx_cloud[i] = final_x_cloud[i]
-            m_cloud_rx_edge[i] = final_x_cloud[i]
+            # Cloud processes its own queue
+            capacity_cloud = (f_cloud[i] / Config.PHI) * Config.TIME_SLOT_DURATION
+            processed_cloud = min(self.queues_cloud[i], capacity_cloud)
+            
+            m_cloud_proc[i] = processed_cloud
+            
+            # Energy (Cloud)
+            if f_cloud[i] > 0:
+                # Assuming Cloud runs for the time needed or full slot? 
+                # Usually cloud models are simpler. Let's assume proportional to work 
+                # OR full slot if consistent with Edge.
+                # Let's use proportional time for Cloud to be fair, or full slot if specified.
+                # User says: "Total time length 1 Time slot".
+                # So we calculate energy based on full slot if f > 0?
+                # Let's assume standard model: Energy = Power * Time.
+                # Time = bits / Rate.
+                t_active_cloud = processed_cloud / (f_cloud[i] / Config.PHI) if f_cloud[i] > 0 else 0
+                e_c = (f_cloud[i]**3) * Config.ZETA * t_active_cloud
+                
+                m_cloud_energy_comp[i] += e_c
+                carb = ci_cloud[i] * e_c * Config.CONST_JOULE_TO_KWH
+                m_cloud_carbon[i] += carb
+                total_carbon += carb
+            
+            # Store Cloud Receive Metrics (from Edge Phase)
+            m_cloud_rx_edge[i] = actual_x_cloud[i]
+
+        # =================================================================
+        # Phase 4: Queue Updates
+        # =================================================================
+        # Q_i(t+1) = [Q_i(t) - EC_i(t) - x_cloud - sum(x_peer)]^+ + A_i(t) + sum(x_peer_in)
         
-        # Update the edge queue: subtract the offloaded amount, add arrivals, and add tasks offloaded from other nodes
-        self.queues_edge -= (np.sum(final_x_peer, axis=1) + final_x_cloud)
-        peer_in = np.sum(final_x_peer, axis=0)
-        self.queues_edge += arrival + peer_in
+        # Calculate Peer Inflow (sum of column j)
+        peer_inflow = np.sum(actual_x_peer, axis=0)
         
-        # ensure that floating-point errors do not result in tiny negative values
-        self.queues_edge = np.maximum(self.queues_edge, 0.0)
+        # Update Edge Queues
+        # We perform the subtraction using the actuals we calculated
+        # Since we enforced (EC + x + sum_x) <= Q_pre implies the [ ]^+ term is 0 if empty
+        # But we use max(0, ...) just to be safe against float errors
         
-        # Update Cloud Queue
-        self.queues_cloud -= bits_processed_cloud
-        self.queues_cloud = np.maximum(self.queues_cloud, 0.0)
-        self.queues_cloud += final_x_cloud
+        # Note: actual_ec was limited by q_remaining.
+        # q_remaining was Q - x_peer - x_cloud.
+        # So Q - x_peer - x_cloud - actual_ec >= 0.
         
+        term_removal = actual_ec + actual_x_cloud + np.sum(actual_x_peer, axis=1)
+        self.queues_edge = np.maximum(0, self.queues_edge - term_removal)
+        
+        # Add Arrivals and Peer Inflow
+        self.queues_edge += arrival + peer_inflow
+        
+        # Update Cloud Queues
+        # Q_cloud(t+1) = Q_cloud(t) - Processed + Inflow(from Edge)
+        self.queues_cloud = np.maximum(0, self.queues_cloud - m_cloud_proc)
+        self.queues_cloud += actual_x_cloud
+        
+        # =================================================================
+        # Logging & Info
+        # =================================================================
         self.time_step += 1
         
         info = {
             'carbon': total_carbon,
             'q_avg_total': np.mean(self.queues_edge),
-            'processed_local': np.mean(bits_processed_local),
-            'processed_cloud': np.mean(bits_processed_cloud),
-            'offloaded_cloud': np.mean(final_x_cloud)
+            'processed_local': np.mean(actual_ec),
+            'processed_cloud': np.mean(m_cloud_proc),
+            'offloaded_cloud': np.mean(actual_x_cloud)
         }
         
         if self.logger:
@@ -259,7 +313,7 @@ class CloudEdgeEnvironment:
                     'arrival': arrival[i],
                     'q_pre': m_edge_q_pre[i],
                     'q_post': self.queues_edge[i],
-                    'proc_local': m_edge_proc_local[i],
+                    'proc_local': actual_ec[i],
                     'tx_peer': m_edge_tx_peer[i],
                     'tx_cloud': m_edge_tx_cloud[i],
                     'energy_comp': m_edge_energy_comp[i],

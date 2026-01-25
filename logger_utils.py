@@ -4,34 +4,42 @@ import numpy as np
 from config import Config
 
 class SimulationLogger:
-    def __init__(self, algorithm_name, input_filename):
+    def __init__(self, algorithm_name, output_dir):
+        """
+        初始化 Logger
+        :param algorithm_name: 演算法名稱 (用於檔名)
+        :param output_dir: 使用者指定的輸出根目錄 (e.g., Base_Output)
+        """
         self.algorithm_name = algorithm_name
-        self.base_name = os.path.splitext(os.path.basename(input_filename))[0]
         
-        self.log_dir = 'logs'
-        self.output_dir = 'outputs'
-        self.detailed_dir = 'detailed_stats'
+        # 設定輸出子資料夾結構
+        self.output_root = output_dir
+        self.log_dir = os.path.join(self.output_root, 'logs')
+        self.csv_dir = os.path.join(self.output_root, 'csv')
         
-        for directory in [self.log_dir, self.output_dir, self.detailed_dir]:
+        # 確保資料夾存在
+        for directory in [self.log_dir, self.csv_dir]:
             os.makedirs(directory, exist_ok=True)
         
-        self.log_file = os.path.join(self.log_dir, f'log_{self.algorithm_name}_{self.base_name}.txt')
-        self.stats_file = os.path.join(self.detailed_dir, f'stats_{self.algorithm_name}_{self.base_name}.csv')
+        # 設定檔案路徑
+        self.log_file = os.path.join(self.log_dir, f'log_{self.algorithm_name}.txt')
+        self.stats_file = os.path.join(self.csv_dir, f'stats_{self.algorithm_name}.csv')
         
         # Set Logging
         self.logger = logging.getLogger(f"SimLogger_{algorithm_name}")
         self.logger.setLevel(logging.INFO)
         
+        # 清除舊的 handlers 避免重複寫入
         if self.logger.hasHandlers():
             self.logger.handlers.clear()
             
-        file_handler = logging.FileHandler(self.log_file, mode='w')
+        file_handler = logging.FileHandler(self.log_file, mode='w', encoding='utf-8')
         formatter = logging.Formatter('%(message)s')
         file_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
         
         # Init CSV header
-        with open(self.stats_file, 'w') as f:
+        with open(self.stats_file, 'w', encoding='utf-8') as f:
             header = "TimeSlot,"
             # Edge Headers
             for i in range(Config.NUM_EDGE_SERVERS):
@@ -50,7 +58,9 @@ class SimulationLogger:
             header += "Total_Carbon(g),Avg_System_Q(bits)\n"
             f.write(header)
             
-        print(f"Logger initialized. Logs at: {self.log_file}, Stats at: {self.stats_file}")
+        print(f"[{algorithm_name}] Logger initialized.")
+        print(f"   - Logs: {self.log_file}")
+        print(f"   - CSV : {self.stats_file}")
 
     def log_step(self, metrics):
         self._write_csv_stats(metrics)
@@ -62,7 +72,7 @@ class SimulationLogger:
         cloud_data = metrics['cloud_metrics']
         glob = metrics['global_metrics']
         
-        with open(self.stats_file, 'a') as f:
+        with open(self.stats_file, 'a', encoding='utf-8') as f:
             line = f"{step},"
             
             for i in range(Config.NUM_EDGE_SERVERS):

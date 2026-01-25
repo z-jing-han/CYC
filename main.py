@@ -1,4 +1,7 @@
 import numpy as np
+import argparse
+import os
+import sys
 from config import Config
 from data_loader import DataLoader
 from marl_env import CloudEdgeEnvironment
@@ -6,13 +9,47 @@ from dwpa_solver import DWPASolver
 from marl_agent import RandomAgent, QLearningAgent, MARLController
 from logger_utils import SimulationLogger
 
-def run_simulation(algorithm='DWPA'):
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Green MEC Simulation Runner")
+    parser.add_argument('--input_dir', type=str, required=True, 
+                        help="Path to the input directory containing config.json, carbon_intensity.csv, and data_arrival.csv")
+    parser.add_argument('--output_dir', type=str, required=True, 
+                        help="Path to the output directory where logs and csv folders will be created")
+    
+    args = parser.parse_args()
+    return args
+
+def validate_input_files(input_dir):
+    """
+    驗證 input_dir 是否存在以及是否包含所有必要的檔案
+    """
+    if not os.path.exists(input_dir):
+        raise FileNotFoundError(f"Error: Input directory '{input_dir}' does not exist.")
+
+    required_files = {
+        'config': 'config.json',
+        'carbon': 'carbon_intensity.csv',
+        'task': 'data_arrival.csv'
+    }
+
+    found_paths = {}
+
+    for key, filename in required_files.items():
+        file_path = os.path.join(input_dir, filename)
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Error: Missing required file '{filename}' in '{input_dir}'")
+        found_paths[key] = file_path
+    
+    return found_paths
+
+def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
     print(f"\n=== Starting Simulation with Algorithm: {algorithm} ===")
     
-    # 1. Initialize Logger
-    logger = SimulationLogger(algorithm, Config.CONFIG_FILE)
+    # 1. Initialize Logger with custom output directory
+    logger = SimulationLogger(algorithm, output_dir)
     
     # 2. Initialize Data and Environment
+    # Config paths have already been updated in __main__ block
     data_loader = DataLoader()
     env = CloudEdgeEnvironment(data_loader, logger=logger, enable_dvfs=True)
     
@@ -88,16 +125,42 @@ def run_simulation(algorithm='DWPA'):
     return total_carbon, avg_q
 
 if __name__ == "__main__":
-    c_dwpa, q_dwpa = run_simulation('DWPA')
-    c_marl, q_marl = run_simulation('MARL')
-    c_ql, q_ql = run_simulation('QLearning')
+    # 1. Parse Arguments
+    args = parse_arguments()
     
-    TO_MB = 1.0 / Config.MB_TO_BITS
-    
-    print("\n" + "="*40)
-    print("=== FINAL COMPARISON (單位: g, MB) ===")
-    print("="*40)
-    print(f"DWPA      | Carbon: {c_dwpa:10.4f} g | Avg Queue: {q_dwpa*TO_MB:10.2f} MB")
-    print(f"MARL(Rnd) | Carbon: {c_marl:10.4f} g | Avg Queue: {q_marl*TO_MB:10.2f} MB")
-    print(f"QLearning | Carbon: {c_ql:10.4f} g | Avg Queue: {q_ql*TO_MB:10.2f} MB")
-    print("="*40)
+    try:
+        # 2. Validate Inputs
+        files = validate_input_files(args.input_dir)
+        print(f"Input verification passed. Using input dir: {args.input_dir}")
+        
+        # 3. Setup Global Config (This affects DataLoader)
+        Config.CONFIG_JSON = files['config']
+        Config.CARBON_FILE = files['carbon']
+        Config.TASK_FILE = files['task']
+        
+        # 4. Setup Output Directory
+        if not os.path.exists(args.output_dir):
+            os.makedirs(args.output_dir)
+            print(f"Created output directory: {args.output_dir}")
+            
+        # 5. Run Simulations
+        c_dwpa, q_dwpa = run_simulation('DWPA', args.output_dir)
+        c_marl, q_marl = run_simulation('MARL', args.output_dir)
+        c_ql, q_ql = run_simulation('QLearning', args.output_dir)
+        
+        TO_MB = 1.0 / Config.MB_TO_BITS
+        
+        print("\n" + "="*40)
+        print("=== FINAL COMPARISON (單位: g, MB) ===")
+        print("="*40)
+        print(f"DWPA      | Carbon: {c_dwpa:10.4f} g | Avg Queue: {q_dwpa*TO_MB:10.2f} MB")
+        print(f"MARL(Rnd) | Carbon: {c_marl:10.4f} g | Avg Queue: {q_marl*TO_MB:10.2f} MB")
+        print(f"QLearning | Carbon: {c_ql:10.4f} g | Avg Queue: {q_ql*TO_MB:10.2f} MB")
+        print("="*40)
+        
+    except FileNotFoundError as e:
+        print(f"\n[CRITICAL ERROR] {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n[UNEXPECTED ERROR] {e}")
+        sys.exit(1)
