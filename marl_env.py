@@ -2,10 +2,9 @@ import numpy as np
 from config import Config
 
 class CloudEdgeEnvironment:
-    def __init__(self, data_loader, logger=None, enable_dvfs=True):
+    def __init__(self, data_loader, logger=None):
         self.task_data, self.ci_hist_raw, self.ci_pred_raw, self.edge_graph = data_loader.load_data()
         self.logger = logger
-        self.enable_dvfs = enable_dvfs
         
         self.num_edge = Config.NUM_EDGE_SERVERS
         self.time_step = 0
@@ -46,13 +45,13 @@ class CloudEdgeEnvironment:
             if edge_name in self.ci_hist_raw:
                 ci_edge[i] = self.ci_hist_raw[edge_name][t]
             else:
-                ci_edge[i] = 0.5
+                raise ValueError(f"Missing edge_name {edge_name}")
                 
             cloud_name = f"Cloud Server {i+1}"
             if cloud_name in self.ci_hist_raw: 
                 ci_cloud[i] = self.ci_hist_raw[cloud_name][t]
             else:
-                ci_cloud[i] = ci_edge[i] 
+                raise ValueError(f"Missing cloud_name {cloud_name}")
                 
             if edge_name in self.task_data:
                 arrival_sizes[i] = self.task_data[edge_name][t]
@@ -69,7 +68,8 @@ class CloudEdgeEnvironment:
     def compute_transmission_rate(self, p_tx, is_cloud=False):
         gain = Config.G_IC if is_cloud else Config.G_IJ
         # Shannon Capacity: W * log2(1 + S/N)
-        # R = W * log2(1 + g*p / N0)
+        # S = g (no unit) * p (W)
+        # R (bits/sec) = W (Hz) * log2(1 + S (W) /N (W))
         snr = 0 if Config.NOISE_POWER <= 0 else (p_tx * gain) / Config.NOISE_POWER
         rate = Config.BANDWIDTH * np.log2(1 + snr)
         return rate
@@ -188,6 +188,7 @@ class CloudEdgeEnvironment:
             # Peer Energy
             for j in range(self.num_edge):
                 if final_t_peer[j] > 0:
+                    # gCO2 = k (g/kWh) * (kWh/J = 1 / (3600 * 1000) = 2.778e-7) *  W (J/sec) * sec
                     e_j = p_peer[i, j] * final_t_peer[j]
                     m_edge_energy_tx[i] += e_j
                     carb = ci_edge[i] * e_j * Config.CONST_JOULE_TO_KWH
@@ -196,6 +197,7 @@ class CloudEdgeEnvironment:
             
             # Cloud Energy
             if final_t_cloud > 0:
+                # Same as peer
                 e_c = p_cloud[i] * final_t_cloud
                 m_edge_energy_tx[i] += e_c
                 carb = ci_edge[i] * e_c * Config.CONST_JOULE_TO_KWH
@@ -227,6 +229,8 @@ class CloudEdgeEnvironment:
             # regardless of whether the queue empties early. This is common in time-slotted models
             # where the server is "on" for that duration.
             if f_edge[i] > 0 and t_cmp > 0:
+                # gCO2 = k (g/kWh) * zeta * f^3 (sec)^3 * sec
+                t_cmp = min(t_cmp, m_edge_proc_local[i] / (f_edge[i] / Config.PHI))
                 e_cmp = (f_edge[i]**3) * Config.ZETA * t_cmp
                 m_edge_energy_comp[i] += e_cmp
                 carb = ci_edge[i] * e_cmp * Config.CONST_JOULE_TO_KWH
@@ -254,6 +258,7 @@ class CloudEdgeEnvironment:
                 # So we calculate energy based on full slot if f > 0?
                 # Let's assume standard model: Energy = Power * Time.
                 # Time = bits / Rate.
+                # Same as edge computation
                 t_active_cloud = processed_cloud / (f_cloud[i] / Config.PHI) if f_cloud[i] > 0 else 0
                 e_c = (f_cloud[i]**3) * Config.ZETA * t_active_cloud
                 

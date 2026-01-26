@@ -39,10 +39,6 @@ def generate_traffic_data(config_path, output_path):
         print("Error: Invalid config structure.")
         return
     
-    print(f"Reading config from: {config_path}")
-    print(f"Using Model: {selected_model}")
-    print(f"Target: {num_servers} Edge Servers, {num_timeslots} Time Slots")
-
     all_servers_data = []
 
     if selected_model == 'on-off-model':
@@ -98,7 +94,6 @@ def generate_traffic_data(config_path, output_path):
             writer = csv.writer(csvfile)
             writer.writerow(headers)
             writer.writerows(transposed_data)
-        print(f"Successfully generated: {output_path}")
     except Exception as e:
         print(f"Error writing output file: {e}")
     

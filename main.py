@@ -20,9 +20,6 @@ def parse_arguments():
     return args
 
 def validate_input_files(input_dir):
-    """
-    驗證 input_dir 是否存在以及是否包含所有必要的檔案
-    """
     if not os.path.exists(input_dir):
         raise FileNotFoundError(f"Error: Input directory '{input_dir}' does not exist.")
 
@@ -45,20 +42,12 @@ def validate_input_files(input_dir):
 def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
     print(f"\n=== Starting Simulation with Algorithm: {algorithm} ===")
     
-    # 1. Initialize Logger with custom output directory
     logger = SimulationLogger(algorithm, output_dir)
-    
-    # 2. Initialize Data and Environment
-    # Config paths have already been updated in __main__ block
     data_loader = DataLoader()
-    env = CloudEdgeEnvironment(data_loader, logger=logger, enable_dvfs=True)
-    
+    env = CloudEdgeEnvironment(data_loader, logger=logger)
     total_steps = env.max_time_steps
-    print(f"Total Time Slots for this round: {total_steps}")
     
-    # 3. Initialize Controller / Solver
-    solver = None
-    marl_controller = None
+    solver, marl_controller = None, None
     
     if algorithm == 'DWPA':
         solver = DWPASolver(env)
@@ -71,19 +60,15 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
     else:
         raise ValueError(f"Unknown algorithm: {algorithm}")
     
-    # 4. Execution Loop
+    # Execution Loop
     state = env.reset()
-    
-    history_carbon = []
-    history_q = []
-    
+    history_carbon, history_q = [], []
     done = False
     step_count = 0
-    
     TO_MB = 1.0 / Config.MB_TO_BITS
     
     while not done:
-        # Get Decisions
+        # Get Action
         if algorithm == 'DWPA':
             decisions = solver.solve(state)
         else: # MARL or QLearning
@@ -131,7 +116,6 @@ if __name__ == "__main__":
     try:
         # 2. Validate Inputs
         files = validate_input_files(args.input_dir)
-        print(f"Input verification passed. Using input dir: {args.input_dir}")
         
         # 3. Setup Global Config (This affects DataLoader)
         Config.CONFIG_JSON = files['config']
@@ -141,21 +125,20 @@ if __name__ == "__main__":
         # 4. Setup Output Directory
         if not os.path.exists(args.output_dir):
             os.makedirs(args.output_dir)
-            print(f"Created output directory: {args.output_dir}")
             
         # 5. Run Simulations
         c_dwpa, q_dwpa = run_simulation('DWPA', args.output_dir)
-        c_marl, q_marl = run_simulation('MARL', args.output_dir)
-        c_ql, q_ql = run_simulation('QLearning', args.output_dir)
+        # c_marl, q_marl = run_simulation('MARL', args.output_dir)
+        # c_ql, q_ql = run_simulation('QLearning', args.output_dir)
         
         TO_MB = 1.0 / Config.MB_TO_BITS
         
         print("\n" + "="*40)
-        print("=== FINAL COMPARISON (單位: g, MB) ===")
+        print("=== FINAL COMPARISON (Units: g, MB) ===")
         print("="*40)
         print(f"DWPA      | Carbon: {c_dwpa:10.4f} g | Avg Queue: {q_dwpa*TO_MB:10.2f} MB")
-        print(f"MARL(Rnd) | Carbon: {c_marl:10.4f} g | Avg Queue: {q_marl*TO_MB:10.2f} MB")
-        print(f"QLearning | Carbon: {c_ql:10.4f} g | Avg Queue: {q_ql*TO_MB:10.2f} MB")
+        # print(f"MARL(Rnd) | Carbon: {c_marl:10.4f} g | Avg Queue: {q_marl*TO_MB:10.2f} MB")
+        # print(f"QLearning | Carbon: {c_ql:10.4f} g | Avg Queue: {q_ql*TO_MB:10.2f} MB")
         print("="*40)
         
     except FileNotFoundError as e:

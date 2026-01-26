@@ -28,13 +28,11 @@ class DataLoader:
         if task_arrival and ci_history:
             t_len = len(next(iter(task_arrival.values())))
             c_len = len(next(iter(ci_history.values())))
-            print(f"Data Loaded: {len(task_arrival)} Edge Servers, {t_len} Time Slots (Tasks), {c_len} Time Slots (Carbon)")
         
         return task_arrival, ci_history, ci_predict, edge_graph
 
     def _load_topology(self, json_path):
         """Reads config.json to build the edge server topology."""
-        print(f"Loading topology from {json_path}...")
         edge_graph = {}
         
         if not os.path.exists(json_path):
@@ -83,7 +81,6 @@ class DataLoader:
 
     def _load_tasks(self, csv_path):
         """Reads data_arrival.csv."""
-        print(f"Loading tasks from {csv_path}...")
         task_arrival = {}
         
         if not os.path.exists(csv_path):
@@ -106,8 +103,6 @@ class DataLoader:
                     values_bits = df[col].values
                     task_arrival[clean_name] = values_bits.tolist()
             
-            print(f"Task data loaded for cols: {list(task_arrival.keys())}")
-            
         except Exception as e:
             print(f"Failed to parse data_arrival.csv: {e}")
             raise e
@@ -116,7 +111,6 @@ class DataLoader:
 
     def _load_carbon(self, csv_path):
         """Reads carbon_data.csv for History and Prediction."""
-        print(f"Loading carbon data from {csv_path}...")
         ci_history = {}
         ci_predict = {}
         
@@ -158,8 +152,6 @@ class DataLoader:
                     ci_predict[c_name] = cloud_vals
             else:
                 raise ValueError("No Cloud Carbon column found")
-                    
-            print(f"Carbon data loaded.")
 
         except Exception as e:
             print(f"Failed to parse carbon_data.csv: {e}")

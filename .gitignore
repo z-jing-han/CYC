@@ -2,5 +2,5 @@ __pycache__
 dwpa_solver.py
 ChenPC*
 pcchen_mid.pdf
-Base_Input
+Base_Input/*.csv
 Base_Output

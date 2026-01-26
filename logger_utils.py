@@ -6,30 +6,25 @@ from config import Config
 class SimulationLogger:
     def __init__(self, algorithm_name, output_dir):
         """
-        初始化 Logger
-        :param algorithm_name: 演算法名稱 (用於檔名)
-        :param output_dir: 使用者指定的輸出根目錄 (e.g., Base_Output)
+        Init Logger
+        :param algorithm_name: Algroithm (using in filename)
+        :param output_dir: User defined output directory (e.g., Base_Output)
         """
         self.algorithm_name = algorithm_name
         
-        # 設定輸出子資料夾結構
         self.output_root = output_dir
         self.log_dir = os.path.join(self.output_root, 'logs')
         self.csv_dir = os.path.join(self.output_root, 'csv')
         
-        # 確保資料夾存在
         for directory in [self.log_dir, self.csv_dir]:
             os.makedirs(directory, exist_ok=True)
         
-        # 設定檔案路徑
         self.log_file = os.path.join(self.log_dir, f'log_{self.algorithm_name}.txt')
         self.stats_file = os.path.join(self.csv_dir, f'stats_{self.algorithm_name}.csv')
         
-        # Set Logging
         self.logger = logging.getLogger(f"SimLogger_{algorithm_name}")
         self.logger.setLevel(logging.INFO)
         
-        # 清除舊的 handlers 避免重複寫入
         if self.logger.hasHandlers():
             self.logger.handlers.clear()
             
@@ -38,17 +33,14 @@ class SimulationLogger:
         file_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
         
-        # Init CSV header
         with open(self.stats_file, 'w', encoding='utf-8') as f:
             header = "TimeSlot,"
-            # Edge Headers
             for i in range(Config.NUM_EDGE_SERVERS):
                 p = f"Edge{i+1}"
                 header += (f"{p}_Arrival(bits),{p}_Q_Pre(bits),{p}_Q_Post(bits),"
                            f"{p}_Proc_Local(bits),{p}_Tx_Peer(bits),{p}_Tx_Cloud(bits),"
                            f"{p}_Energy_Comp(J),{p}_Energy_Tx(J),{p}_Carbon(g),")
             
-            # Cloud Headers
             for i in range(Config.NUM_CLOUD_SERVERS):
                 p = f"Cloud{i+1}"
                 header += (f"{p}_Q_Pre(bits),{p}_Q_Post(bits),"
@@ -57,10 +49,6 @@ class SimulationLogger:
             
             header += "Total_Carbon(g),Avg_System_Q(bits)\n"
             f.write(header)
-            
-        print(f"[{algorithm_name}] Logger initialized.")
-        print(f"   - Logs: {self.log_file}")
-        print(f"   - CSV : {self.stats_file}")
 
     def log_step(self, metrics):
         self._write_csv_stats(metrics)
