@@ -119,6 +119,19 @@ class DataLoader:
 
         try:
             df = pd.read_csv(csv_path)
+
+            # alpha pred helper
+            def calculate_alpha_pred(actuals, alpha):
+                preds = []
+                if not actuals:
+                    return preds
+                last_pred = actuals[0]
+                preds.append(last_pred)
+                for t in range(1, len(actuals)):
+                    new_pred = alpha * actuals[t-1] + (1 - alpha) * last_pred
+                    preds.append(new_pred)
+                    last_pred = new_pred
+                return preds
             
             # Expected columns: TimeSlot, Edge_1_History, ..., Cloud_Shared_History
             
@@ -132,10 +145,9 @@ class DataLoader:
                         if len(parts) >= 2 and parts[1].isdigit():
                             server_id = parts[1]
                             server_name = f"Edge Server {server_id}"
-                            
                             vals = df[col].values.tolist()
                             ci_history[server_name] = vals
-                            ci_predict[server_name] = vals # Assume perfect prediction for now
+                            ci_predict[server_name] = calculate_alpha_pred(vals, Config.ALPHAS[int(server_id) - 1])
                     except:
                         print(f"Skipping unknown column format: {col}")
 
@@ -149,7 +161,7 @@ class DataLoader:
                 for i in range(Config.NUM_CLOUD_SERVERS):
                     c_name = f"Cloud Server {i+1}"
                     ci_history[c_name] = cloud_vals
-                    ci_predict[c_name] = cloud_vals
+                    ci_predict[c_name] = calculate_alpha_pred(cloud_vals, Config.ALPHA_CLOUD)
             else:
                 raise ValueError("No Cloud Carbon column found")
 

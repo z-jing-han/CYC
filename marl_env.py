@@ -42,14 +42,15 @@ class CloudEdgeEnvironment:
         for i in range(self.num_edge):
             edge_name = f"Edge Server {i+1}"
             
-            if edge_name in self.ci_hist_raw:
-                ci_edge[i] = self.ci_hist_raw[edge_name][t]
+            # Change to Predict State
+            if edge_name in self.ci_pred_raw:
+                ci_edge[i] = self.ci_pred_raw[edge_name][t]
             else:
                 raise ValueError(f"Missing edge_name {edge_name}")
                 
             cloud_name = f"Cloud Server {i+1}"
-            if cloud_name in self.ci_hist_raw: 
-                ci_cloud[i] = self.ci_hist_raw[cloud_name][t]
+            if cloud_name in self.ci_pred_raw: 
+                ci_cloud[i] = self.ci_pred_raw[cloud_name][t]
             else:
                 raise ValueError(f"Missing cloud_name {cloud_name}")
                 
@@ -93,8 +94,16 @@ class CloudEdgeEnvironment:
 
         # 2. Get Environment State
         state = self._get_state()
-        ci_edge = state['CI_edge']
-        ci_cloud = state['CI_cloud']
+        # ci_edge = state['CI_edge']
+        # ci_cloud = state['CI_cloud']
+        # Environment need to use history data
+        t_actual = self.time_step % self.max_time_steps
+        ci_edge = np.zeros(self.num_edge)
+        ci_cloud = np.zeros(self.num_edge)
+        for i in range(self.num_edge):
+            ci_edge[i] = self.ci_hist_raw[f"Edge Server {i+1}"][t_actual]
+            ci_cloud[i] = self.ci_hist_raw[f"Cloud Server {i+1}"][t_actual]
+        
         arrival = state['Arrival']
         
         # Initialize Metrics

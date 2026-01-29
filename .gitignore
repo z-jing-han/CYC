@@ -1,6 +1,9 @@
 __pycache__
-dwpa_solver.py
+dwpa*.py
 ChenPC*
 pcchen_mid.pdf
-Base_Input/*.csv
-Base_Output
+
+Data/*
+!Data/Base_Input/
+Data/Base_Input/*
+!Data/Base_Input/config.json

@@ -6,6 +6,9 @@ from config import Config
 from data_loader import DataLoader
 from marl_env import CloudEdgeEnvironment
 from dwpa_solver import DWPASolver
+from dwpa_local import DWPALFSolver
+from dwpa_vertical import DWPAVOSolver
+from dwpa_horizontal import DWPAHFSolver
 from marl_agent import RandomAgent, QLearningAgent, MARLController
 from logger_utils import SimulationLogger
 
@@ -40,7 +43,7 @@ def validate_input_files(input_dir):
     return found_paths
 
 def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
-    print(f"\n=== Starting Simulation with Algorithm: {algorithm} ===")
+    # print(f"\n=== Starting Simulation with Algorithm: {algorithm} ===")
     
     logger = SimulationLogger(algorithm, output_dir)
     data_loader = DataLoader()
@@ -51,6 +54,12 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
     
     if algorithm == 'DWPA':
         solver = DWPASolver(env)
+    elif algorithm == 'DWPALF':
+        solver = DWPALFSolver(env)
+    elif algorithm == 'DWPAVO':
+        solver = DWPAVOSolver(env)
+    elif algorithm == 'DWPAHF':
+        solver = DWPAHFSolver(env)
     elif algorithm == 'MARL': 
         agents = [RandomAgent(i, Config.NUM_EDGE_SERVERS) for i in range(Config.NUM_EDGE_SERVERS)]
         marl_controller = MARLController(env, agents)
@@ -69,7 +78,7 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
     
     while not done:
         # Get Action
-        if algorithm == 'DWPA':
+        if algorithm[:4] == 'DWPA':
             decisions = solver.solve(state)
         else: # MARL or QLearning
             decisions = marl_controller.get_decisions(state)
@@ -91,9 +100,9 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
         history_q.append(info['q_avg_total']) 
         
         # Terminal Output (with units)
-        if step_count % 50 == 0 or step_count == total_steps - 1:
-             print(f"Step {step_count:04d}: C={carbon:.4f} g, Q_sys={info['q_avg_total']*TO_MB:.2f} MB "
-                   f"(Loc:{info['processed_local']*TO_MB:.2f} MB, Cld:{info['processed_cloud']*TO_MB:.2f} MB, OffC:{info['offloaded_cloud']*TO_MB:.2f} MB)")
+        # if step_count % 50 == 0 or step_count == total_steps - 1:
+        #      print(f"Step {step_count:04d}: C={carbon:.4f} g, Q_sys={info['q_avg_total']*TO_MB:.2f} MB "
+        #            f"(Loc:{info['processed_local']*TO_MB:.2f} MB, Cld:{info['processed_cloud']*TO_MB:.2f} MB, OffC:{info['offloaded_cloud']*TO_MB:.2f} MB)")
         
         state = next_state
         step_count += 1
@@ -103,9 +112,9 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
     
     logger.close()
     
-    print(f"\n>>> Simulation Finished ({algorithm}) <<<")
-    print(f"Total Carbon: {total_carbon:.4f} g")
-    print(f"Avg System Queue: {avg_q*TO_MB:.2f} MB")
+    # print(f"\n>>> Simulation Finished ({algorithm}) <<<")
+    # print(f"Total Carbon: {total_carbon:.4f} g")
+    # print(f"Avg System Queue: {avg_q*TO_MB:.2f} MB")
     
     return total_carbon, avg_q
 
@@ -128,18 +137,24 @@ if __name__ == "__main__":
             
         # 5. Run Simulations
         c_dwpa, q_dwpa = run_simulation('DWPA', args.output_dir)
+        c_dwpalf, q_dwpalf = run_simulation('DWPALF', args.output_dir)
+        c_dwpavo, q_dwpavo = run_simulation('DWPAVO', args.output_dir)
+        c_dwpahf, q_dwpahf = run_simulation('DWPAHF', args.output_dir)
         # c_marl, q_marl = run_simulation('MARL', args.output_dir)
         # c_ql, q_ql = run_simulation('QLearning', args.output_dir)
         
         TO_MB = 1.0 / Config.MB_TO_BITS
         
-        print("\n" + "="*40)
-        print("=== FINAL COMPARISON (Units: g, MB) ===")
-        print("="*40)
+        # print("\n" + "="*40)
+        # print("=== FINAL COMPARISON (Units: g, MB) ===")
+        print("="*63)
         print(f"DWPA      | Carbon: {c_dwpa:10.4f} g | Avg Queue: {q_dwpa*TO_MB:10.2f} MB")
+        print(f"DWPALF    | Carbon: {c_dwpalf:10.4f} g | Avg Queue: {q_dwpalf*TO_MB:10.2f} MB")
+        print(f"DWPAVO    | Carbon: {c_dwpavo:10.4f} g | Avg Queue: {q_dwpavo*TO_MB:10.2f} MB")
+        print(f"DWPAHF    | Carbon: {c_dwpahf:10.4f} g | Avg Queue: {q_dwpahf*TO_MB:10.2f} MB")
         # print(f"MARL(Rnd) | Carbon: {c_marl:10.4f} g | Avg Queue: {q_marl*TO_MB:10.2f} MB")
         # print(f"QLearning | Carbon: {c_ql:10.4f} g | Avg Queue: {q_ql*TO_MB:10.2f} MB")
-        print("="*40)
+        print("="*63)
         
     except FileNotFoundError as e:
         print(f"\n[CRITICAL ERROR] {e}")

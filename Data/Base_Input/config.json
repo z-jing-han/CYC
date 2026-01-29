@@ -128,16 +128,16 @@
                     "off_to_on": 0.15
                 },
                 "on_state_params": {
-                    "mean_bits": 512000000.0,
-                    "std_dev_bits": 16000000.0
+                    "mean_bits": 536870912.0,
+                    "std_dev_bits": 16777216.0
                 },
                 "off_state_params": {
-                    "mean_bits": 25600000,
-                    "std_dev_bits": 16000000.0
+                    "mean_bits": 26843545.6,
+                    "std_dev_bits": 16777216.0
                 }
             },
             "poisson-distribution": {
-                "lambda_bits": 512000000.0
+                "lambda_bits": 536870912.0
             }
         }
     }
