@@ -75,11 +75,10 @@ def get_algorithm_name(filename):
     return name
 
 def process_and_plot_simulation_details(csv_dir, figures_dir):
-    # Define output subdir
-    carbon_dir = os.path.join(figures_dir, 'Carbon_Emission')
-    queue_dir = os.path.join(figures_dir, 'Queue_Len')
-    ensure_dir(carbon_dir)
-    ensure_dir(queue_dir)
+    algo_groups = {
+        'dwpa': ['DWPA', 'DWPALF', 'DWPAVO', 'DWPAHF'],
+        'competitor': ['DWPA', 'DOLA22', 'ICSOC19', 'YCL24']
+    }
 
     # find all csv
     csv_files = glob.glob(os.path.join(csv_dir, "*.csv"))
@@ -111,26 +110,22 @@ def process_and_plot_simulation_details(csv_dir, figures_dir):
             if time_index is None:
                 time_index = df['TimeSlot'] if 'TimeSlot' in df.columns else df.index
             
-            cloud_prefix = 'Cloud'
-            
             for entity_key, config in entities.items():
                 if config['type'] == 'single':
                     prefix = config['prefix']
                     col_name = next((c for c in df.columns if c.startswith(prefix) and 'Carbon' in c), None)
                     if col_name:
                         data_store['Carbon'][entity_key][algo_name] = df[col_name]
-                
                 elif config['type'] == 'sum':
                     cols = [c for c in df.columns if ('Edge' in c or 'Cloud' in c) and 'Carbon' in c]
                     if cols:
                         data_store['Carbon'][entity_key][algo_name] = df[cols].sum(axis=1)
+                
                 if config['type'] == 'single':
                     prefix = config['prefix']
                     col_name = next((c for c in df.columns if c.startswith(prefix) and ('Q_Post' in c or 'Queue' in c)), None)
                     if col_name:
-                        # bits to Mb
-                        data_store['Queue'][entity_key][algo_name] = df[col_name] / 1e6
-                
+                        data_store['Queue'][entity_key][algo_name] = df[col_name] / 1e6 # bits to Mb
                 elif config['type'] == 'sum':
                     cols = [c for c in df.columns if ('Edge' in c or 'Cloud' in c) and ('Q_Post' in c or 'Queue' in c)]
                     if cols:
@@ -139,21 +134,25 @@ def process_and_plot_simulation_details(csv_dir, figures_dir):
         except Exception as e:
             print(f"Error processing file {fpath}: {e}")
     
-    def plot_metric_group(metric_name, output_folder, y_label, file_suffix):
+    def plot_metric_group(metric_name, output_folder, y_label, file_suffix, allowed_algos):
         """
         metric_name: 'Carbon' or 'Queue'
-        output_folder: folder path
-        y_label: label for Y axis
-        file_suffix: 'carbon' or 'queue'
+        output_folder: specific folder path (e.g. figures/dwpa/Carbon_Emission)
+        allowed_algos: list of algorithms to plot for this group
         """
         
         for entity_key, algo_data in data_store[metric_name].items():
-            if not algo_data:
+            # Filter: Only include algos that are in the allowed list AND exist in data
+            filtered_data = {algo: series for algo, series in algo_data.items() if algo in allowed_algos}
+            
+            if not filtered_data:
                 continue
 
             plt.figure(figsize=(10, 6))
             
-            for algo, series in algo_data.items():
+            # Sort keys to ensure consistent color assignment if needed, or just iterate
+            for algo in sorted(filtered_data.keys()):
+                series = filtered_data[algo]
                 plt.plot(time_index, series, label=algo, linewidth=2, alpha=0.8)
             
             entity_label = entities[entity_key]['label']
@@ -173,19 +172,30 @@ def process_and_plot_simulation_details(csv_dir, figures_dir):
             finally:
                 plt.close()
     
-    plot_metric_group(
-        metric_name='Carbon',
-        output_folder=carbon_dir,
-        y_label='Carbon Emission (g)',
-        file_suffix='carbon'
-    )
+    # 2. Iterate through groups and plot
+    for group_name, allowed_list in algo_groups.items():
+        group_base_dir = os.path.join(figures_dir, group_name)
+        carbon_dir = os.path.join(group_base_dir, 'Carbon_Emission')
+        queue_dir = os.path.join(group_base_dir, 'Queue_Len')
+        
+        ensure_dir(carbon_dir)
+        ensure_dir(queue_dir)
 
-    plot_metric_group(
-        metric_name='Queue',
-        output_folder=queue_dir,
-        y_label='Queue Length (Mb)',
-        file_suffix='queue'
-    )
+        plot_metric_group(
+            metric_name='Carbon',
+            output_folder=carbon_dir,
+            y_label='Carbon Emission (g)',
+            file_suffix='carbon',
+            allowed_algos=allowed_list
+        )
+
+        plot_metric_group(
+            metric_name='Queue',
+            output_folder=queue_dir,
+            y_label='Queue Length (Mb)',
+            file_suffix='queue',
+            allowed_algos=allowed_list
+        )
 
 if __name__ == "__main__":
     args = parse_arguments()

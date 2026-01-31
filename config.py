@@ -33,7 +33,7 @@ class Config:
     V = 1e12                   # Control parameter (Trade-off between Energy and Queue)
     
     # --- Alpha Smoothing (Can be updated from config.json if needed) ---
-    ALPHAS = [0.86, 0.75, 0.95, 0.97, 0.65]
+    ALPHAS = list()
     ALPHA_CLOUD = 0.93
 
     # --- Data Unit Scaling ---

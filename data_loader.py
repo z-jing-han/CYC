@@ -20,6 +20,7 @@ class DataLoader:
             edge_graph (dict): {ServerName: [NeighborName, ...]}
         """
         
+        self._load_config(self.config_json_path)
         edge_graph = self._load_topology(self.config_json_path)
         task_arrival = self._load_tasks(self.task_csv_path)
         ci_history, ci_predict = self._load_carbon(self.carbon_csv_path)
@@ -30,6 +31,37 @@ class DataLoader:
             c_len = len(next(iter(ci_history.values())))
         
         return task_arrival, ci_history, ci_predict, edge_graph
+
+    def _load_config(self, json_path):
+        """Reads config.json to get all config information"""
+        if not os.path.exists(json_path):
+            raise FileNotFoundError(f"Error: {json_path} not found.")
+
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                config_data = json.load(f)
+            
+            Config.NUM_EDGE_SERVERS = config_data['system_settings']['num_edge_servers']
+            Config.NUM_CLOUD_SERVERS = Config.NUM_EDGE_SERVERS
+            Config.TIME_SLOT_DURATION = config_data['system_settings']['duration_seconds']
+            Config.CLOUD_F_MAX = config_data['system_settings']['cloud_max_freq_Hz']
+            Config.EDGE_F_MAX = config_data['system_settings']['edge_max_freq_Hz']
+            Config.EDGE_P_MAX = config_data['system_settings']['edge_max_trans_power_W']
+            Config.PHI = config_data['system_settings']['cpu_cycles_per_bit']
+            Config.ZETA = config_data['system_settings']['effective_capacitance_Zeta']
+            Config.BANDWIDTH = config_data['system_settings']['edge_bandwith_Hz']
+            # Conver dBm to W
+            Config.NOISE_POWER = 10 ** ((config_data['system_settings']['noise_power_dBm'] - 30) / 10)
+            Config.G_IJ = config_data['system_settings']['channel_gain']
+            Config.G_IC = config_data['system_settings']['channel_gain']
+            for i in range(Config.NUM_EDGE_SERVERS):
+                Config.ALPHAS.append(config_data['servers']['edge_servers'][i]['alpha'])
+            Config.ALPHA_CLOUD = config_data['servers']['cloud_servers'][i]['alpha']
+            Config.V = config_data['system_settings']['trade_off_V']
+
+        except Exception as e:
+            print(f"Failed to parse config.json in _load_config: {e}")
+            raise e
 
     def _load_topology(self, json_path):
         """Reads config.json to build the edge server topology."""
@@ -42,24 +74,6 @@ class DataLoader:
             with open(json_path, 'r', encoding='utf-8') as f:
                 config_data = json.load(f)
             
-            # Read Global Config
-            if 'system_settings' in config_data:
-                Config.NUM_EDGE_SERVERS = config_data['system_settings'].get('num_edge_servers', Config.NUM_EDGE_SERVERS)
-                Config.NUM_CLOUD_SERVERS = Config.NUM_EDGE_SERVERS
-                Config.TIME_SLOT_DURATION = config_data['system_settings'].get('duration_seconds', Config.TIME_SLOT_DURATION)
-                Config.CLOUD_F_MAX = config_data['system_settings'].get('cloud_max_freq_Hz', Config.CLOUD_F_MAX)
-                Config.EDGE_F_MAX = config_data['system_settings'].get('edge_max_freq_Hz', Config.EDGE_F_MAX)
-                Config.EDGE_P_MAX = config_data['system_settings'].get('edge_max_trans_power_W', Config.EDGE_P_MAX)
-                Config.PHI = config_data['system_settings'].get('cpu_cycles_per_bit', Config.PHI)
-                Config.ZETA = config_data['system_settings'].get('effective_capacitance_Zeta', Config.ZETA)
-                Config.BANDWIDTH = config_data['system_settings'].get('edge_bandwith_Hz', Config.BANDWIDTH)
-                # Conver dBm to W
-                Config.NOISE_POWER = 10 ** ((config_data['system_settings'].get('noise_power_dBm', -130) - 30) / 10)
-                Config.G_IJ = config_data['system_settings'].get('channel_gain', Config.G_IJ)
-                Config.G_IC = config_data['system_settings'].get('channel_gain', Config.G_IC)
-            else:
-                print("system_settings lost in config.json, using default setting")
-
             # Parse Adjacency Matrix
             matrix = config_data.get('topology', {}).get('matrix', [])
             edge_servers = config_data.get('servers', {}).get('edge_servers', [])
@@ -74,7 +88,7 @@ class DataLoader:
                 edge_graph[curr_name] = neighbors
             
         except Exception as e:
-            print(f"Failed to parse config.json: {e}")
+            print(f"Failed to parse config.json in _load_topology: {e}")
             raise e
 
         return edge_graph
@@ -90,7 +104,6 @@ class DataLoader:
             df = pd.read_csv(csv_path)
             
             # normalize keys to "Edge Server 1"
-            
             for col in df.columns:
                 # Normalize key: replace underscore with space if it looks like a server name
                 if "Edge" in col:

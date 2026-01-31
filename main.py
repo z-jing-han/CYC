@@ -2,15 +2,26 @@ import numpy as np
 import argparse
 import os
 import sys
+
+# Project File
 from config import Config
 from data_loader import DataLoader
 from marl_env import CloudEdgeEnvironment
-from dwpa_solver import DWPASolver
-from dwpa_local import DWPALFSolver
-from dwpa_vertical import DWPAVOSolver
-from dwpa_horizontal import DWPAHFSolver
-from marl_agent import RandomAgent, QLearningAgent, MARLController
 from logger_utils import SimulationLogger
+
+# DWPA Solver File
+from dwpa_solver.dwpa import DWPASolver
+from dwpa_solver.dwpa_local import DWPALFSolver
+from dwpa_solver.dwpa_vertical import DWPAVOSolver
+from dwpa_solver.dwpa_horizontal import DWPAHFSolver
+
+# Other Competitors
+from dwpa_competitor.dola22_solver import DOLA22Solver
+from dwpa_competitor.icsoc19_solver import ICSOC19Solver
+from dwpa_competitor.ycl24_solver import YCL24Solver
+
+# RL
+from marl_agent import RandomAgent, QLearningAgent, MARLController
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Green MEC Simulation Runner")
@@ -51,15 +62,19 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
     total_steps = env.max_time_steps
     
     solver, marl_controller = None, None
-    
-    if algorithm == 'DWPA':
-        solver = DWPASolver(env)
-    elif algorithm == 'DWPALF':
-        solver = DWPALFSolver(env)
-    elif algorithm == 'DWPAVO':
-        solver = DWPAVOSolver(env)
-    elif algorithm == 'DWPAHF':
-        solver = DWPAHFSolver(env)
+
+    solver_classes = {
+        'DWPA': DWPASolver,
+        'DWPALF': DWPALFSolver,
+        'DWPAVO': DWPAVOSolver,
+        'DWPAHF': DWPAHFSolver,
+        'DOLA22': DOLA22Solver,
+        'ICSOC19': ICSOC19Solver,
+        'YCL24': YCL24Solver
+    }
+
+    if algorithm in solver_classes:
+        solver = solver_classes[algorithm](env)
     elif algorithm == 'MARL': 
         agents = [RandomAgent(i, Config.NUM_EDGE_SERVERS) for i in range(Config.NUM_EDGE_SERVERS)]
         marl_controller = MARLController(env, agents)
@@ -78,7 +93,7 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
     
     while not done:
         # Get Action
-        if algorithm[:4] == 'DWPA':
+        if solver is not None:
             decisions = solver.solve(state)
         else: # MARL or QLearning
             decisions = marl_controller.get_decisions(state)
@@ -134,26 +149,25 @@ if __name__ == "__main__":
         # 4. Setup Output Directory
         if not os.path.exists(args.output_dir):
             os.makedirs(args.output_dir)
-            
+        
         # 5. Run Simulations
-        c_dwpa, q_dwpa = run_simulation('DWPA', args.output_dir)
-        c_dwpalf, q_dwpalf = run_simulation('DWPALF', args.output_dir)
-        c_dwpavo, q_dwpavo = run_simulation('DWPAVO', args.output_dir)
-        c_dwpahf, q_dwpahf = run_simulation('DWPAHF', args.output_dir)
-        # c_marl, q_marl = run_simulation('MARL', args.output_dir)
-        # c_ql, q_ql = run_simulation('QLearning', args.output_dir)
+        algorithms_to_run = [
+            'DWPA', 'DWPALF', 'DWPAVO', 'DWPAHF',
+            'DOLA22', 'ICSOC19', 'YCL24'
+            # 'MARL', 'QLearning'
+        ]
+        
+        results = {}
+        for algo in algorithms_to_run:
+            c, q = run_simulation(algo, args.output_dir)
+            results[algo] = {'carbon': c, 'queue': q}
         
         TO_MB = 1.0 / Config.MB_TO_BITS
         
-        # print("\n" + "="*40)
         # print("=== FINAL COMPARISON (Units: g, MB) ===")
         print("="*63)
-        print(f"DWPA      | Carbon: {c_dwpa:10.4f} g | Avg Queue: {q_dwpa*TO_MB:10.2f} MB")
-        print(f"DWPALF    | Carbon: {c_dwpalf:10.4f} g | Avg Queue: {q_dwpalf*TO_MB:10.2f} MB")
-        print(f"DWPAVO    | Carbon: {c_dwpavo:10.4f} g | Avg Queue: {q_dwpavo*TO_MB:10.2f} MB")
-        print(f"DWPAHF    | Carbon: {c_dwpahf:10.4f} g | Avg Queue: {q_dwpahf*TO_MB:10.2f} MB")
-        # print(f"MARL(Rnd) | Carbon: {c_marl:10.4f} g | Avg Queue: {q_marl*TO_MB:10.2f} MB")
-        # print(f"QLearning | Carbon: {c_ql:10.4f} g | Avg Queue: {q_ql*TO_MB:10.2f} MB")
+        for algo in algorithms_to_run:
+            print(f"{algo:<10}| Carbon: {results[algo]['carbon']:10.4f} g | Avg Queue: {results[algo]['queue'] * TO_MB:10.2f} MB")
         print("="*63)
         
     except FileNotFoundError as e:

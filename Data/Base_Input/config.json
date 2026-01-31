@@ -10,7 +10,8 @@
         "cpu_cycles_per_bit": 1000.0,
         "effective_capacitance_Zeta": 1e-18,
         "noise_power_dBm": -130,
-        "channel_gain": 1e-4
+        "channel_gain": 1e-4,
+        "trade_off_V": 1e12
     },
     "topology": {
         "description": "Adjacency matrix for Edge Servers",
@@ -58,31 +59,36 @@
                 "id": 1,
                 "name": "Edge Server 1",
                 "city_name": "Seattle (OR)",
-                "max_capacity_bits": 30000000000000
+                "max_capacity_bits": 30000000000000,
+                "alpha": 0.86
             },
             {
                 "id": 2,
                 "name": "Edge Server 2",
                 "city_name": "Cheyenne (WY)",
-                "max_capacity_bits": 30000000000000
+                "max_capacity_bits": 30000000000000,
+                "alpha": 0.75
             },
             {
                 "id": 3,
                 "name": "Edge Server 3",
                 "city_name": "Chicago (PJM)",
-                "max_capacity_bits": 30000000000000
+                "max_capacity_bits": 30000000000000,
+                "alpha": 0.95
             },
             {
                 "id": 4,
                 "name": "Edge Server 4",
                 "city_name": "New York (NY)",
-                "max_capacity_bits": 30000000000000
+                "max_capacity_bits": 30000000000000,
+                "alpha": 0.97
             },
             {
                 "id": 5,
                 "name": "Edge Server 5",
                 "city_name": "Kansas City (KS)", 
-                "max_capacity_bits": 30000000000000
+                "max_capacity_bits": 30000000000000,
+                "alpha": 0.65
             }
         ],
         "cloud_servers": [
@@ -90,31 +96,36 @@
                 "id": 1,
                 "name": "Cloud Server 1",
                 "city_name": "Berkeley County (SC)",
-                "max_capacity_bits": 10000000000000
+                "max_capacity_bits": 10000000000000,
+                "alpha": 0.93
             },
             {
                 "id": 2,
                 "name": "Cloud Server 2",
                 "city_name": "Berkeley County (SC)",
-                "max_capacity_bits": 10000000000000
+                "max_capacity_bits": 10000000000000,
+                "alpha": 0.93
             },
             {
                 "id": 3,
                 "name": "Cloud Server 3",
                 "city_name": "Berkeley County (SC)",
-                "max_capacity_bits": 10000000000000
+                "max_capacity_bits": 10000000000000,
+                "alpha": 0.93
             },
             {
                 "id": 4,
                 "name": "Cloud Server 4",
                 "city_name": "Berkeley County (SC)",
-                "max_capacity_bits": 10000000000000
+                "max_capacity_bits": 10000000000000,
+                "alpha": 0.93
             },
             {
                 "id": 5,
                 "name": "Cloud Server 5",
                 "city_name": "Berkeley County (SC)",
-                "max_capacity_bits": 10000000000000
+                "max_capacity_bits": 10000000000000,
+                "alpha": 0.93
             }
         ]
     },
