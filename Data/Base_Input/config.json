@@ -10,7 +10,8 @@
         "cpu_cycles_per_bit": 1000.0,
         "effective_capacitance_Zeta": 1e-18,
         "noise_power_dBm": -130,
-        "channel_gain": 1e-4,
+        "channel_gain_peer": 1e-4,
+        "channel_gain_cloud": 1e-4,
         "trade_off_V": 1e12
     },
     "topology": {
@@ -139,16 +140,16 @@
                     "off_to_on": 0.15
                 },
                 "on_state_params": {
-                    "mean_bits": 536870912.0,
-                    "std_dev_bits": 16777216.0
+                    "mean_bits": 512000000.0,
+                    "std_dev_bits": 16000000.0
                 },
                 "off_state_params": {
-                    "mean_bits": 26843545.6,
-                    "std_dev_bits": 16777216.0
+                    "mean_bits": 25600000.0,
+                    "std_dev_bits": 16000000.0
                 }
             },
             "poisson-distribution": {
-                "lambda_bits": 536870912.0
+                "lambda_bits": 512000000.0
             }
         }
     }

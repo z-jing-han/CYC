@@ -1,17 +1,14 @@
 # CYC+
 
 ## Environment
+
+### Test one
 ```.bash
-conda env create -f environment.yml
-conda activate cyc
+./test.sh [Input_dir] [Output_dir]
 ```
 
-## Dataset
-
-
-## Exe
-```.bash
-python3 generate.py --dir Base_Input
-python3 main.py --input_dir Base_Input --output_dir Base_Output
-python3 plot.py --input_dir Base_Input --output_dir Base_Output
+### Test different V
+```
+./V_test_exp.sh [Base_dir] [start exp V] [end exp V]
+./V_test_exp.sh -d
 ```

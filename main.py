@@ -54,8 +54,6 @@ def validate_input_files(input_dir):
     return found_paths
 
 def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
-    # print(f"\n=== Starting Simulation with Algorithm: {algorithm} ===")
-    
     logger = SimulationLogger(algorithm, output_dir)
     data_loader = DataLoader()
     env = CloudEdgeEnvironment(data_loader, logger=logger)
@@ -89,7 +87,6 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
     history_carbon, history_q = [], []
     done = False
     step_count = 0
-    TO_MB = 1.0 / Config.MB_TO_BITS
     
     while not done:
         # Get Action
@@ -113,12 +110,7 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
         
         history_carbon.append(carbon)
         history_q.append(info['q_avg_total']) 
-        
-        # Terminal Output (with units)
-        # if step_count % 50 == 0 or step_count == total_steps - 1:
-        #      print(f"Step {step_count:04d}: C={carbon:.4f} g, Q_sys={info['q_avg_total']*TO_MB:.2f} MB "
-        #            f"(Loc:{info['processed_local']*TO_MB:.2f} MB, Cld:{info['processed_cloud']*TO_MB:.2f} MB, OffC:{info['offloaded_cloud']*TO_MB:.2f} MB)")
-        
+               
         state = next_state
         step_count += 1
         
@@ -126,10 +118,6 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
     avg_q = np.mean(history_q)
     
     logger.close()
-    
-    # print(f"\n>>> Simulation Finished ({algorithm}) <<<")
-    # print(f"Total Carbon: {total_carbon:.4f} g")
-    # print(f"Avg System Queue: {avg_q*TO_MB:.2f} MB")
     
     return total_carbon, avg_q
 
@@ -162,12 +150,10 @@ if __name__ == "__main__":
             c, q = run_simulation(algo, args.output_dir)
             results[algo] = {'carbon': c, 'queue': q}
         
-        TO_MB = 1.0 / Config.MB_TO_BITS
-        
         # print("=== FINAL COMPARISON (Units: g, MB) ===")
         print("="*63)
         for algo in algorithms_to_run:
-            print(f"{algo:<10}| Carbon: {results[algo]['carbon']:10.4f} g | Avg Queue: {results[algo]['queue'] * TO_MB:10.2f} MB")
+            print(f"{algo:<10}| Carbon: {results[algo]['carbon']:10.4f} g | Avg Queue: {results[algo]['queue'] / Config.MB_TO_BITS:10.2f} MB")
         print("="*63)
         
     except FileNotFoundError as e:

@@ -27,7 +27,8 @@ class CloudEdgeEnvironment:
     def reset(self):
         self.time_step = 0
         # Reset Queues: 5 MB Initial
-        self.queues_edge.fill(5.0 * Config.MB_TO_BITS) 
+        # Change to 0 MB
+        self.queues_edge.fill(0.0) 
         self.queues_cloud.fill(0)
         
         return self._get_state()
