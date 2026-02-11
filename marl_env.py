@@ -26,8 +26,7 @@ class CloudEdgeEnvironment:
 
     def reset(self):
         self.time_step = 0
-        # Reset Queues: 5 MB Initial
-        # Change to 0 MB
+        # Reset Queues: 0 MB Initial
         self.queues_edge.fill(0.0) 
         self.queues_cloud.fill(0)
         
@@ -219,7 +218,9 @@ class CloudEdgeEnvironment:
             # =================================================================
             # Time for computation
             total_tx_time_final = np.sum(final_t_peer) + final_t_cloud
-            t_cmp = max(0, Config.TIME_SLOT_DURATION - total_tx_time_final)
+            total_tx_time_final = min(total_tx_time_final, Config.TIME_SLOT_DURATION)
+            t_cmp = Config.TIME_SLOT_DURATION
+            # t_cmp = max(0, Config.TIME_SLOT_DURATION - total_tx_time_final)
             
             # Compute Capacity: EC_i = f * T_cmp / phi
             ec_capacity = (f_edge[i] * t_cmp) / Config.PHI
@@ -331,6 +332,8 @@ class CloudEdgeEnvironment:
                     'proc_local': actual_ec[i],
                     'tx_peer': m_edge_tx_peer[i],
                     'tx_cloud': m_edge_tx_cloud[i],
+                    'pow_peer': np.sum(p_peer[i]),
+                    'pow_cloud': p_cloud[i],
                     'energy_comp': m_edge_energy_comp[i],
                     'energy_tx': m_edge_energy_tx[i],
                     'carbon': m_edge_carbon[i]

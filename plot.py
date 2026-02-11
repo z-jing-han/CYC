@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import json
 
-# 引入 DataLoader
 from data_loader import DataLoader
 
 try:
@@ -34,36 +33,29 @@ def plot_carbon_intensity(ci_history, figures_dir, config_data=None):
     Legend is horizontal, expanded to fill the plot width, and placed below the title.
     """
     
-    # --- Debug: 檢查數據是否真的有傳進來 ---
     if not ci_history:
         print("[Plot Warning] ci_history is empty! Skipping carbon intensity plot.")
         return
     
-    # 檢查是否有任何有效的 Trace (長度 > 0)
     valid_traces = [t for t in ci_history.values() if len(t) > 0]
     if not valid_traces:
         print(f"[Plot Warning] ci_history has keys {list(ci_history.keys())} but all traces are empty.")
         return
-    # ---------------------------------------
-
-    # --- 建立標籤映射字典 ---
+    
     label_map = {}
     if config_data:
         try:
-            # 處理 Edge Servers
             for s in config_data.get('servers', {}).get('edge_servers', []):
                 short_name = s['name'].replace("Edge Server", "Edge").strip()
                 label_map[s['name']] = f"{s['city_name']} ({short_name})"
             
-            # 處理 Cloud Servers
             cloud_servers = config_data.get('servers', {}).get('cloud_servers', [])
             if cloud_servers:
                 for s in cloud_servers:
                     label_map[s['name']] = f"{s['city_name']} (Cloud)"
         except Exception as e:
             print(f"[Plot Warning] Failed to create label map from config: {e}. Using default names.")
-
-    # [調整] 加大寬度 (15, 8) 以確保橫向圖例有足夠空間展開而不擁擠
+    
     plt.figure(figsize=(15, 8)) 
     
     plotted_something = False
@@ -76,19 +68,16 @@ def plot_carbon_intensity(ci_history, figures_dir, config_data=None):
             plt.plot(traces, label=label, alpha=0.8, linewidth=2)
             plotted_something = True
 
-    # Loop 2: Cloud Servers (Cloud 只畫一次，且樣式正常)
+    # Loop 2: Cloud Servers
     for s_name, traces in ci_history.items():
         if "Cloud" in s_name and len(traces) > 0:
             if not cloud_plotted:
                 label = label_map.get(s_name, s_name)
-                # Cloud 樣式與 Edge 相同
                 plt.plot(traces, label=label, alpha=0.8, linewidth=2)
                 
                 plotted_something = True
                 cloud_plotted = True
-
-    # [調整] 設定標題與軸標籤
-    # pad=60: 將標題向上推，留出中間的空間給圖例
+    
     plt.title("Carbon Intensity Traces Across Locations", fontsize=18, fontweight='bold', pad=60) 
     
     plt.xlabel("Time Slot", fontsize=14)
@@ -96,13 +85,6 @@ def plot_carbon_intensity(ci_history, figures_dir, config_data=None):
     plt.grid(True, linestyle='--', alpha=0.6)
     
     if plotted_something:
-        # [修改重點] 圖例設定：對齊數據寬度
-        # bbox_to_anchor=(0., 1.02, 1., .102):
-        #   前兩個參數 (0, 1.02) 定義左下角座標 (在圖表區域上方一點點)
-        #   第三個參數 (1.) 定義寬度為 100% (與圖表同寬)
-        # mode="expand": 強制圖例內容平均分散填滿這個寬度
-        # ncol=6: 設定為 6 欄 (5 Edge + 1 Cloud)，確保排成一列
-        
         plt.legend(
             bbox_to_anchor=(0., 1.02, 1., .102), 
             loc='lower left',
@@ -116,8 +98,7 @@ def plot_carbon_intensity(ci_history, figures_dir, config_data=None):
         plt.tight_layout()
         
         save_path = os.path.join(figures_dir, "carbon_intensity_trace.png")
-        plt.savefig(save_path, dpi=300) 
-        # print(f"[Plot] Saved carbon intensity trace to {save_path}")
+        plt.savefig(save_path, dpi=300)
     else:
         print("[Plot Warning] No 'Edge' or 'Cloud' servers found in ci_history to plot.")
     
@@ -134,7 +115,7 @@ def get_algorithm_name(filename):
 def process_and_plot_simulation_details(csv_dir, figures_dir):
     algo_groups = {
         'dwpa': ['DWPA', 'DWPALF', 'DWPAVO', 'DWPAHF'],
-        'competitor': ['DWPA', 'DOLA22', 'ICSOC19', 'YCL24']
+        'competitor': ['DWPA', 'DOLA22', 'YCL24', 'ICSOC19']
     }
 
     # find all csv
@@ -255,7 +236,6 @@ def process_and_plot_simulation_details(csv_dir, figures_dir):
         )
 
 if __name__ == "__main__":
-    # 1. 讀取參數
     args = parse_arguments()
     
     figures_dir = os.path.join(args.output_dir, 'figures')
@@ -263,23 +243,18 @@ if __name__ == "__main__":
     
     stats_csv_dir = os.path.join(args.output_dir, 'csv')
 
-    # 2. 建構正確的完整路徑 (指向 Data/Base_Input)
     ci_input_path = os.path.join(args.input_dir, 'carbon_intensity.csv')
     config_input_path = os.path.join(args.input_dir, 'config.json')
     task_input_path = os.path.join(args.input_dir, 'data_arrival.csv') 
 
-    # 新增：讀取 Config Data 以供繪圖標籤使用
     config_data_for_plot = None
     try:
         with open(config_input_path, 'r', encoding='utf-8') as f:
             config_data_for_plot = json.load(f)
     except Exception as e:
         print(f"[Warning] Failed to load config.json for plotting labels: {e}")
-
-    # 3. 初始化 DataLoader 並傳入所有路徑
+    
     try:
-        # print(f"Loading data via DataLoader from: {args.input_dir} ...")
-        
         loader = DataLoader(
             config_path=config_input_path, 
             carbon_path=ci_input_path,
@@ -287,17 +262,12 @@ if __name__ == "__main__":
         )
         
         _, ci_history, _, _ = loader.load_data()
-        
-        # 繪圖 (傳入 config_data)
         plot_carbon_intensity(ci_history, figures_dir, config_data=config_data_for_plot)
         
     except Exception as e:
         print(f"[Warning] Failed to load data via DataLoader: {e}")
-        # import traceback
-        # traceback.print_exc() 
         print("Skipping Carbon Intensity Trace plot.")
-
-    # 4. 處理模擬結果 CSV
+    
     if os.path.exists(stats_csv_dir):
         process_and_plot_simulation_details(stats_csv_dir, figures_dir)
     else:

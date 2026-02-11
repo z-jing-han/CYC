@@ -80,7 +80,10 @@ def generate_traffic_data(config_path, output_path):
         for server_idx in range(num_servers):
             server_trace = np.random.poisson(lam, num_timeslots)
             all_servers_data.append(server_trace)
-    
+    elif selected_model == 'const-bit-rate':
+        params = model_config['models']['const-bit-rate']
+        bit_rate = params['bit-rate']
+        all_servers_data = [[bit_rate for _ in range(num_timeslots)] for _ in range(num_servers)]
     else:
         print(f"Error: Unknown select model {selected_model}")
         return

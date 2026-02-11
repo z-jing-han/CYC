@@ -8,11 +8,11 @@
         "edge_max_trans_power_W": 1.0,
         "edge_bandwith_Hz": 1e6,
         "cpu_cycles_per_bit": 1000.0,
-        "effective_capacitance_Zeta": 1e-18,
-        "noise_power_dBm": -130,
-        "channel_gain_peer": 1e-4,
-        "channel_gain_cloud": 1e-4,
-        "trade_off_V": 1e12
+        "effective_capacitance_Zeta": 1e-28,
+        "noise_power_dBm": -90,
+        "channel_gain_peer": 1e-8,
+        "channel_gain_cloud": 1e-8,
+        "trade_off_V": 1e21
     },
     "topology": {
         "description": "Adjacency matrix for Edge Servers",
@@ -140,16 +140,19 @@
                     "off_to_on": 0.15
                 },
                 "on_state_params": {
-                    "mean_bits": 512000000.0,
-                    "std_dev_bits": 16000000.0
+                    "mean_bits": 49200000000.0,
+                    "std_dev_bits": 1520000000.0
                 },
                 "off_state_params": {
-                    "mean_bits": 25600000.0,
-                    "std_dev_bits": 16000000.0
+                    "mean_bits": 2460000000.0,
+                    "std_dev_bits": 1520000000.0
                 }
             },
             "poisson-distribution": {
-                "lambda_bits": 512000000.0
+                "lambda_bits": 18432000000.0
+            },
+            "const-bit-rate": {
+                "bit-rate": 10000000000.0
             }
         }
     }

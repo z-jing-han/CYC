@@ -39,6 +39,7 @@ class SimulationLogger:
                 p = f"Edge{i+1}"
                 header += (f"{p}_Arrival(bits),{p}_Q_Pre(bits),{p}_Q_Post(bits),"
                            f"{p}_Proc_Local(bits),{p}_Tx_Peer(bits),{p}_Tx_Cloud(bits),"
+                           f"{p}_Pow_Peer(W),{p}_Pow_Cloud(W),"
                            f"{p}_Energy_Comp(J),{p}_Energy_Tx(J),{p}_Carbon(g),")
             
             for i in range(Config.NUM_CLOUD_SERVERS):
@@ -67,6 +68,7 @@ class SimulationLogger:
                 e = edge_data[i]
                 line += (f"{e['arrival']:.2f},{e['q_pre']:.2f},{e['q_post']:.2f},"
                          f"{e['proc_local']:.2f},{e['tx_peer']:.2f},{e['tx_cloud']:.2f},"
+                         f"{e['pow_peer']:.4f},{e['pow_cloud']:.4f},"
                          f"{e['energy_comp']:.4e},{e['energy_tx']:.4e},{e['carbon']:.6f},")
             
             for i in range(Config.NUM_CLOUD_SERVERS):
@@ -97,6 +99,7 @@ class SimulationLogger:
             log(f"  Start Queue: {e['q_pre']*TO_MB:.4f} MB -> End Queue: {e['q_post']*TO_MB:.4f} MB")
             log(f"  Processed (Local): {e['proc_local']*TO_MB:.4f} MB")
             log(f"  Offloaded -> Peer: {e['tx_peer']*TO_MB:.4f} MB, Cloud: {e['tx_cloud']*TO_MB:.4f} MB")
+            log(f"  Trans Power -> Peer: {e['pow_peer']:.4f} W, " f"Cloud: {e['pow_cloud']:.4f} W")
             log(f"  Energy: Comp={e['energy_comp']:.4f} J, Tx={e['energy_tx']:.4f} J")
             log(f"  Carbon: {e['carbon']:.6f} g")
 
