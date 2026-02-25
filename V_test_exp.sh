@@ -91,12 +91,12 @@ for (( exp=START_EXP; exp<=END_EXP; exp++ )); do
         if jq --argjson v "$V_VAL" '.system_settings.trade_off_V = $v' "$TARGET_CONFIG" > "$tmp_json"; then
                 mv "$tmp_json" "$TARGET_CONFIG"
         else
-                echo "Error: jq failed to update config for V=$V_VAL"
-                rm "$tmp_json"
-                exit 1
+            echo "Error: jq failed to update config for V=$V_VAL"
+            rm "$tmp_json"
+            exit 1
         fi
 
-        ./test.sh "./Data/$CURRENT_INPUT_NAME" "./Data/$CURRENT_OUTPUT_NAME"
+        ./run.sh "./Data/$CURRENT_INPUT_NAME" "./Data/$CURRENT_OUTPUT_NAME"
 
         copy_result "$V_TAG" "competitor" "Carbon_Emission" "Total_carbon.png" "Total_carbon"
         copy_result "$V_TAG" "competitor" "Queue_Len" "Total_queue.png" "Total_queue"

@@ -113,6 +113,22 @@ class SimulationLogger:
             
         log(f"Total Carbon Emission: {glob['total_carbon']:.6f} g")
         log(f"Avg System Queue: {glob['avg_q']*TO_MB:.4f} MB")
+    
+    def log_algorithm_decisions(self, step, decisions):
+        log = self.logger.info
+        TO_MB = 1.0 / Config.MB_TO_BITS
+        
+        log(f"=============== Algorithm Decisions ===============")
+        log(f"Time Slot {step}:")
+        
+        for i in range(Config.NUM_EDGE_SERVERS):
+            log(f"Edge Server {i+1} Decisions:")
+            log(f"  f_edge: {decisions['f_edge'][i]:.2f}")
+            log(f"  x_cloud: {decisions['x_cloud'][i] * TO_MB:.4f} MB | p_cloud: {decisions['p_cloud'][i]:.4f} W")
+            peer_x = [f"{decisions['x_peer'][i][j] * TO_MB:.4f}" for j in range(Config.NUM_EDGE_SERVERS) if i != j]
+            peer_p = [f"{decisions['p_peer'][i][j]:.4f}" for j in range(Config.NUM_EDGE_SERVERS) if i != j]
+            log(f"  x_peer: [{', '.join(peer_x)}] MB | p_peer: [{', '.join(peer_p)}] W")
+        log(f"===================================================")
 
     def close(self):
         handlers = self.logger.handlers[:]

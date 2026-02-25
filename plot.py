@@ -125,13 +125,17 @@ def process_and_plot_simulation_details(csv_dir, figures_dir):
         return
     
     entities = {
-        'Total':  {'type': 'sum', 'label': 'Total System'},
-        'Edge1':  {'type': 'single', 'prefix': 'Edge1', 'label': 'Edge Server 1'},
-        'Edge2':  {'type': 'single', 'prefix': 'Edge2', 'label': 'Edge Server 2'},
-        'Edge3':  {'type': 'single', 'prefix': 'Edge3', 'label': 'Edge Server 3'},
-        'Edge4':  {'type': 'single', 'prefix': 'Edge4', 'label': 'Edge Server 4'},
-        'Edge5':  {'type': 'single', 'prefix': 'Edge5', 'label': 'Edge Server 5'},
-        'Cloud':  {'type': 'single', 'prefix': 'Cloud', 'label': 'Cloud Server'}
+        'Total':  {'carbon_col': 'Total_Carbon(g)', 'queue_col': 'Avg_System_Q(bits)', 'label': 'Total System'},
+        'Edge1':  {'carbon_col': 'Edge1_Carbon(g)', 'queue_col': 'Edge1_Q_Post(bits)', 'label': 'Edge Server 1'},
+        'Edge2':  {'carbon_col': 'Edge2_Carbon(g)', 'queue_col': 'Edge2_Q_Post(bits)', 'label': 'Edge Server 2'},
+        'Edge3':  {'carbon_col': 'Edge3_Carbon(g)', 'queue_col': 'Edge3_Q_Post(bits)', 'label': 'Edge Server 3'},
+        'Edge4':  {'carbon_col': 'Edge4_Carbon(g)', 'queue_col': 'Edge4_Q_Post(bits)', 'label': 'Edge Server 4'},
+        'Edge5':  {'carbon_col': 'Edge5_Carbon(g)', 'queue_col': 'Edge5_Q_Post(bits)', 'label': 'Edge Server 5'},
+        'Cloud1': {'carbon_col': 'Cloud1_Carbon(g)', 'queue_col': 'Cloud1_Q_Post(bits)', 'label': 'Cloud Server 1'},
+        'Cloud2': {'carbon_col': 'Cloud2_Carbon(g)', 'queue_col': 'Cloud2_Q_Post(bits)', 'label': 'Cloud Server 2'},
+        'Cloud3': {'carbon_col': 'Cloud3_Carbon(g)', 'queue_col': 'Cloud3_Q_Post(bits)', 'label': 'Cloud Server 3'},
+        'Cloud4': {'carbon_col': 'Cloud4_Carbon(g)', 'queue_col': 'Cloud4_Q_Post(bits)', 'label': 'Cloud Server 4'},
+        'Cloud5': {'carbon_col': 'Cloud5_Carbon(g)', 'queue_col': 'Cloud5_Q_Post(bits)', 'label': 'Cloud Server 5'}
     }
 
     data_store = {
@@ -143,31 +147,20 @@ def process_and_plot_simulation_details(csv_dir, figures_dir):
 
     for fpath in csv_files:
         algo_name = get_algorithm_name(fpath)
-        try:
+        try: 
             df = pd.read_csv(fpath)
             if time_index is None:
                 time_index = df['TimeSlot'] if 'TimeSlot' in df.columns else df.index
             
             for entity_key, config in entities.items():
-                if config['type'] == 'single':
-                    prefix = config['prefix']
-                    col_name = next((c for c in df.columns if c.startswith(prefix) and 'Carbon' in c), None)
-                    if col_name:
-                        data_store['Carbon'][entity_key][algo_name] = df[col_name]
-                elif config['type'] == 'sum':
-                    cols = [c for c in df.columns if ('Edge' in c or 'Cloud' in c) and 'Carbon' in c]
-                    if cols:
-                        data_store['Carbon'][entity_key][algo_name] = df[cols].sum(axis=1)
+                carbon_col = config['carbon_col']
+                queue_col = config['queue_col']
                 
-                if config['type'] == 'single':
-                    prefix = config['prefix']
-                    col_name = next((c for c in df.columns if c.startswith(prefix) and ('Q_Post' in c or 'Queue' in c)), None)
-                    if col_name:
-                        data_store['Queue'][entity_key][algo_name] = df[col_name] / 1e6 # bits to Mb
-                elif config['type'] == 'sum':
-                    cols = [c for c in df.columns if ('Edge' in c or 'Cloud' in c) and ('Q_Post' in c or 'Queue' in c)]
-                    if cols:
-                        data_store['Queue'][entity_key][algo_name] = df[cols].sum(axis=1) / 1e6
+                if carbon_col in df.columns:
+                    data_store['Carbon'][entity_key][algo_name] = df[carbon_col]
+                
+                if queue_col in df.columns:
+                    data_store['Queue'][entity_key][algo_name] = df[queue_col] / (8 * 1024 * 1024)
 
         except Exception as e:
             print(f"Error processing file {fpath}: {e}")
@@ -230,7 +223,7 @@ def process_and_plot_simulation_details(csv_dir, figures_dir):
         plot_metric_group(
             metric_name='Queue',
             output_folder=queue_dir,
-            y_label='Queue Length (Mb)',
+            y_label='Queue Length (MB)',
             file_suffix='queue',
             allowed_algos=allowed_list
         )

@@ -55,7 +55,6 @@ def generate_traffic_data(config_path, output_path):
 
         for server_idx in range(num_servers):
             server_trace = []
-            # Random initial state
             is_on = random.choice([True, False])
             
             for _ in range(num_timeslots):

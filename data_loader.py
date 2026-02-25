@@ -44,8 +44,7 @@ class DataLoader:
                 config_data = json.load(f)
             
             Config.NUM_EDGE_SERVERS = config_data['system_settings']['num_edge_servers']
-            cloud_list = config_data['servers'].get('cloud_servers', [])
-            Config.NUM_CLOUD_SERVERS = len(cloud_list) 
+            Config.NUM_CLOUD_SERVERS = Config.NUM_EDGE_SERVERS
             Config.TIME_SLOT_DURATION = config_data['system_settings']['duration_seconds']
             Config.CLOUD_F_MAX = config_data['system_settings']['cloud_max_freq_Hz']
             Config.EDGE_F_MAX = config_data['system_settings']['edge_max_freq_Hz']
@@ -61,14 +60,6 @@ class DataLoader:
 
             self.edge_servers_metadata = config_data['servers']['edge_servers']
             self.cloud_servers_metadata = config_data['servers']['cloud_servers']
-
-            # Populate Alphas directly to Config class for global access
-            Config.ALPHAS = [] # Reset first
-            for s in self.edge_servers_metadata:
-                Config.ALPHAS.append(s['alpha'])
-            
-            if self.cloud_servers_metadata:
-                Config.ALPHA_CLOUD = self.cloud_servers_metadata[0]['alpha']
 
         except Exception as e:
             print(f"Failed to parse config.json in _load_config: {e}")
@@ -152,8 +143,8 @@ class DataLoader:
                 return preds
             
             for server_info in self.edge_servers_metadata:
-                s_name = server_info['name']       # e.g., "Edge Server 1"
-                s_city = server_info['city_name']  # e.g., "Seattle (OR)"
+                s_name = server_info['name']
+                s_city = server_info['city_name']
                 s_alpha = server_info['alpha']
                 
                 if s_city in df.columns:
@@ -163,28 +154,38 @@ class DataLoader:
                 else:
                     print(f"Warning: City '{s_city}' for {s_name} not found in Carbon CSV columns: {df.columns.tolist()}")
             
-            for server_info in self.cloud_servers_metadata:
-                c_name = server_info['name']       # e.g., "Cloud Server 1"
-                c_city = server_info['city_name']  # e.g., "Berkeley County (SC)"
-                c_alpha = server_info['alpha']
-                
-                target_col = None
-                if c_city in df.columns:
-                    target_col = c_city
-                else:
-                    import difflib
-                    matches = difflib.get_close_matches(c_city, df.columns, n=1, cutoff=0.8)
-                    if matches:
-                        target_col = matches[0]
-                        print(f"Notice: Mapped config city '{c_city}' to CSV column '{target_col}'")
-                
-                if target_col:
-                    vals = df[target_col].values.tolist()
-                    ci_history[c_name] = vals
-                    ci_predict[c_name] = calculate_alpha_pred(vals, c_alpha)
-                else:
-                     print(f"Warning: City '{c_city}' for {c_name} not found in Carbon CSV.")
+            base_server_config = self.cloud_servers_metadata[0]
+            
+            c_city = base_server_config['city_name']
+            c_alpha = base_server_config['alpha']
+            target_col = None
+            if c_city in df.columns:
+                target_col = c_city
+            else:
+                import difflib
+                matches = difflib.get_close_matches(c_city, df.columns, n=1, cutoff=0.8)
+                if matches:
+                    target_col = matches[0]
+                    print(f"Notice: Mapped config city '{c_city}' to CSV column '{target_col}'")
+            
+            cached_vals = []
+            cached_pred = []
 
+            if target_col:
+                cached_vals = df[target_col].values.tolist()
+                cached_pred = calculate_alpha_pred(cached_vals, c_alpha)
+            else:
+                print(f"Warning: City '{c_city}' not found in Carbon CSV. All servers will track empty data.")
+            
+            for i in range(1, Config.NUM_CLOUD_SERVERS + 1):
+                server_info = base_server_config.copy()
+                server_info['id'] = i
+                server_info['name'] = f"{base_server_config['name']} {i}"
+                c_name = server_info['name']
+                if target_col:
+                    ci_history[c_name] = cached_vals
+                    ci_predict[c_name] = cached_pred
+        
         except Exception as e:
             print(f"Failed to parse carbon_data.csv: {e}")
             raise e

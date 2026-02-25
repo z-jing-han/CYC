@@ -6,7 +6,7 @@ import sys
 # Project File
 from config import Config
 from data_loader import DataLoader
-from marl_env import CloudEdgeEnvironment
+from env_simulator import CloudEdgeEnvironment
 from logger_utils import SimulationLogger
 
 # DWPA Solver File
@@ -19,9 +19,6 @@ from dwpa_solver.dwpa_horizontal import DWPAHFSolver
 from dwpa_competitor.dola22_solver import DOLA22Solver
 from dwpa_competitor.icsoc19_solver import ICSOC19Solver
 from dwpa_competitor.ycl24_solver import YCL24Solver
-
-# RL
-from marl_agent import RandomAgent, QLearningAgent, MARLController
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Green MEC Simulation Runner")
@@ -59,7 +56,7 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
     env = CloudEdgeEnvironment(data_loader, logger=logger)
     total_steps = env.max_time_steps
     
-    solver, marl_controller = None, None
+    solver = None
 
     solver_classes = {
         'DWPA': DWPASolver,
@@ -73,12 +70,6 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
 
     if algorithm in solver_classes:
         solver = solver_classes[algorithm](env)
-    elif algorithm == 'MARL': 
-        agents = [RandomAgent(i, Config.NUM_EDGE_SERVERS) for i in range(Config.NUM_EDGE_SERVERS)]
-        marl_controller = MARLController(env, agents)
-    elif algorithm == 'QLearning':
-        agents = [QLearningAgent(i, Config.NUM_EDGE_SERVERS) for i in range(Config.NUM_EDGE_SERVERS)]
-        marl_controller = MARLController(env, agents)
     else:
         raise ValueError(f"Unknown algorithm: {algorithm}")
     
@@ -92,21 +83,11 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
         # Get Action
         if solver is not None:
             decisions = solver.solve(state)
-        else: # MARL or QLearning
-            decisions = marl_controller.get_decisions(state)
+        else:
+            raise ValueError(f"Solver is None, Unkown Solver, algorithm is: {algorithm}")
             
-        # Environment Step (Logging happens inside here now)
+        # Environment Step
         next_state, carbon, done, info = env.step(decisions)
-        
-        # Training Step
-        if algorithm == 'QLearning':
-            q_values = next_state['Q_edge']
-            rewards = []
-            for i in range(Config.NUM_EDGE_SERVERS):
-                r = - (0.1 * carbon / Config.NUM_EDGE_SERVERS + 1e-6 * q_values[i])
-                rewards.append(r)
-            
-            marl_controller.update_agents(state, decisions, rewards, next_state)
         
         history_carbon.append(carbon)
         history_q.append(info['q_avg_total']) 
@@ -142,7 +123,6 @@ if __name__ == "__main__":
         algorithms_to_run = [
             'DWPA', 'DWPALF', 'DWPAVO', 'DWPAHF',
             'DOLA22', 'ICSOC19', 'YCL24'
-            # 'MARL', 'QLearning'
         ]
         
         results = {}
@@ -150,7 +130,6 @@ if __name__ == "__main__":
             c, q = run_simulation(algo, args.output_dir)
             results[algo] = {'carbon': c, 'queue': q}
         
-        # print("=== FINAL COMPARISON (Units: g, MB) ===")
         print("="*63)
         for algo in algorithms_to_run:
             print(f"{algo:<10}| Carbon: {results[algo]['carbon']:10.4f} g | Avg Queue: {results[algo]['queue'] / Config.MB_TO_BITS:10.2f} MB")
