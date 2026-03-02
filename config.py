@@ -13,6 +13,7 @@ class Config:
     NUM_EDGE_SERVERS = 5
     NUM_CLOUD_SERVERS = 5
     TIME_SLOT_DURATION = 3600.0   # Unit: seconds (s)
+    TIME_SLOT_ADJUST = 'scale'
     
     # --- Physical Parameters ---
     EDGE_F_MAX = 10e9          # 10 GHz
@@ -34,3 +35,6 @@ class Config:
 
     # --- Data Unit Scaling ---
     MB_TO_BITS = 8 * 1e6
+
+    # --- Local Queue Capacity ---
+    EEDGE_Q_CAPACITY = []

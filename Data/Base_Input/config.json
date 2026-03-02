@@ -3,6 +3,7 @@
         "num_timeslots": 1000,
         "num_edge_servers": 5,
         "duration_seconds": 3600,
+        "adjust_mode": "fix_time_slot",
         "cloud_max_freq_Hz": 80e9,
         "edge_max_freq_Hz": 10e9,
         "edge_max_trans_power_W": 1.0,
@@ -26,11 +27,11 @@
     },
     "servers": {
         "edge_servers": [
-            { "id": 1, "name": "Edge Server 1", "city_name": "Seattle (OR)",     "max_capacity_bits": 30000000000000, "alpha": 0.86 },
-            { "id": 2, "name": "Edge Server 2", "city_name": "Cheyenne (WY)",    "max_capacity_bits": 30000000000000, "alpha": 0.75 },
-            { "id": 3, "name": "Edge Server 3", "city_name": "Chicago (PJM)",    "max_capacity_bits": 30000000000000, "alpha": 0.95 },
-            { "id": 4, "name": "Edge Server 4", "city_name": "New York (NY)",    "max_capacity_bits": 30000000000000, "alpha": 0.97 },
-            { "id": 5, "name": "Edge Server 5", "city_name": "Kansas City (KS)", "max_capacity_bits": 30000000000000, "alpha": 0.65 }
+            { "id": 1, "name": "Edge Server 1", "city_name": "Seattle (OR)",     "max_capacity_bits": 480000000000, "alpha": 0.86 },
+            { "id": 2, "name": "Edge Server 2", "city_name": "Cheyenne (WY)",    "max_capacity_bits": 480000000000, "alpha": 0.75 },
+            { "id": 3, "name": "Edge Server 3", "city_name": "Chicago (PJM)",    "max_capacity_bits": 480000000000, "alpha": 0.95 },
+            { "id": 4, "name": "Edge Server 4", "city_name": "New York (NY)",    "max_capacity_bits": 480000000000, "alpha": 0.97 },
+            { "id": 5, "name": "Edge Server 5", "city_name": "Kansas City (KS)", "max_capacity_bits": 480000000000, "alpha": 0.65 }
         ],
         "cloud_servers": [
             { "name": "Cloud Server", "city_name": "Berkeley County (SC)", "max_capacity_bits": 10000000000000, "alpha": 0.93 }

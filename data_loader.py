@@ -46,6 +46,7 @@ class DataLoader:
             Config.NUM_EDGE_SERVERS = config_data['system_settings']['num_edge_servers']
             Config.NUM_CLOUD_SERVERS = Config.NUM_EDGE_SERVERS
             Config.TIME_SLOT_DURATION = config_data['system_settings']['duration_seconds']
+            Config.TIME_SLOT_ADJUST = config_data['system_settings']['adjust_mode']
             Config.CLOUD_F_MAX = config_data['system_settings']['cloud_max_freq_Hz']
             Config.EDGE_F_MAX = config_data['system_settings']['edge_max_freq_Hz']
             Config.EDGE_P_MAX = config_data['system_settings']['edge_max_trans_power_W']
@@ -57,6 +58,9 @@ class DataLoader:
             Config.G_IJ = config_data['system_settings']['channel_gain_peer']
             Config.G_IC = config_data['system_settings']['channel_gain_cloud']
             Config.V = config_data['system_settings']['trade_off_V']
+
+            for i in range(Config.NUM_EDGE_SERVERS):
+                Config.EEDGE_Q_CAPACITY.append(config_data['servers']['edge_servers'][i]['max_capacity_bits'])
 
             self.edge_servers_metadata = config_data['servers']['edge_servers']
             self.cloud_servers_metadata = config_data['servers']['cloud_servers']

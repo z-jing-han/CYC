@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 INPUT_DIR="${1:-Data/Base_Input/}"
 OUTPUT_DIR="${2:-Data/Base_Output/}"

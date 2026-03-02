@@ -11,9 +11,6 @@ from logger_utils import SimulationLogger
 
 # DWPA Solver File
 from dwpa_solver.dwpa import DWPASolver
-from dwpa_solver.dwpa_local import DWPALFSolver
-from dwpa_solver.dwpa_vertical import DWPAVOSolver
-from dwpa_solver.dwpa_horizontal import DWPAHFSolver
 
 # Other Competitors
 from dwpa_competitor.dola22_solver import DOLA22Solver
@@ -60,9 +57,9 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
 
     solver_classes = {
         'DWPA': DWPASolver,
-        'DWPALF': DWPALFSolver,
-        'DWPAVO': DWPAVOSolver,
-        'DWPAHF': DWPAHFSolver,
+        'DWPALF': lambda env: DWPASolver(env, 'LF'),
+        'DWPAVO': lambda env: DWPASolver(env, 'VO'),
+        'DWPAHF': lambda env: DWPASolver(env, 'HF'),
         'DOLA22': DOLA22Solver,
         'ICSOC19': ICSOC19Solver,
         'YCL24': YCL24Solver

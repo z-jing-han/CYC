@@ -4,7 +4,7 @@
 
 ### Test one
 ```.bash
-./test.sh [Input_dir] [Output_dir]
+./run.sh [Input_dir] [Output_dir]
 ```
 
 ### Test different V
@@ -14,11 +14,12 @@
 ```
 
 ### Data Size Parameter Note
-|Time|On Size|Of size|Var Size|Max Edge Queue|
-|:-:|:-:|:-:|:-:|:-:|
-|1sec|64MB|3.2MB|2MB|
+|Time|On Size|Of size|Var Size|Average Size|Max Edge Queue|
+|:-:|:-:|:-:|:-:|:-:|:-:|
+|1sec|64MB|3.2MB|2MB|26MB|
 |1hour||
 
 ### TODO
-+ Revisit the offload size implementation
-+ Revisit dwpa algorithm and dola22 algorithm
++ Time slot
+  + The scale way look not right
++ Why edge queue len limit do not increace the carbon
