@@ -12,8 +12,8 @@ class Config:
     # --- Default System Parameters ---
     NUM_EDGE_SERVERS = 5
     NUM_CLOUD_SERVERS = 5
-    TIME_SLOT_DURATION = 3600.0   # Unit: seconds (s)
-    TIME_SLOT_ADJUST = 'scale'
+    TIME_SLOT_DURATION = 3600.0     # Unit: seconds (s)
+    TIME_SLOT_ADJUST = 'scale'      # 'scale' or 'fix_time_slot'
     
     # --- Physical Parameters ---
     EDGE_F_MAX = 10e9          # 10 GHz

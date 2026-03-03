@@ -13,3 +13,5 @@ dwpa_competitor
 dola22_solver.py
 icsoc19_solver.py
 ycl24_solver.py
+
+run_all_input_dir.sh

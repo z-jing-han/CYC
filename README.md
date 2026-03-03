@@ -20,6 +20,4 @@
 |1hour||
 
 ### TODO
-+ Time slot
-  + The scale way look not right
 + Why edge queue len limit do not increace the carbon
