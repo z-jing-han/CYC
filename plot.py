@@ -15,10 +15,15 @@ except:
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Simulation Result Plotter")
-    parser.add_argument('--input_dir', type=str, required=True, 
+    parser.add_argument('--input_dir', type=str, required=False, 
                         help="Directory containing raw input data (e.g., carbon_intensity.csv)")
     parser.add_argument('--output_dir', type=str, required=True, 
                         help="Directory where 'csv' folder is located and where 'figures' folder will be created")
+    
+    parser.add_argument('--plot_tradeoff', action='store_true', 
+                        help="Plot trade-off for V parameter experiments")
+    parser.add_argument('--tradeoff_data_dir', type=str, 
+                        help="Directory containing all V_*_Input and V_*_Output folders")
     
     args = parser.parse_args()
     return args
@@ -26,6 +31,86 @@ def parse_arguments():
 def ensure_dir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
+
+def plot_tradeoff(tradeoff_data_dir, output_dir):
+    import glob
+    
+    input_dirs = glob.glob(os.path.join(tradeoff_data_dir, 'V_*_Input'))
+    results = []
+    
+    for in_dir in input_dirs:
+        config_path = os.path.join(in_dir, 'config.json')
+        dir_name = os.path.basename(in_dir)
+        tag = dir_name.replace('V_', '').replace('_Input', '')
+        out_dir = os.path.join(tradeoff_data_dir, f'V_{tag}_Output')
+        
+        csv_path = os.path.join(out_dir, 'csv', 'stats_DWPA.csv') 
+        
+        if not os.path.exists(config_path) or not os.path.exists(csv_path):
+            continue
+            
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+            v_val = config.get('system_settings', {}).get('trade_off_V', None)
+            
+        if v_val is not None:
+            try:
+                df = pd.read_csv(csv_path)
+                carbon_cols = [c for c in df.columns if 'Carbon(g)' in c]
+                total_carbon = df[carbon_cols].sum().sum()
+                
+                queue_cols = [c for c in df.columns if 'Q_Post(bits)' in c]
+                total_queue = df[queue_cols].sum().sum()
+                
+                results.append((v_val, total_carbon, total_queue))
+            except Exception as e:
+                print(f"[Warning] Failed to process {csv_path}: {e}")
+                
+    if not results:
+        print("No data found for trade-off plot.")
+        return
+    
+    results.sort(key=lambda x: x[0])
+    v_vals = [x[0] for x in results]
+    carbons = [x[1] for x in results]
+    queues = [x[2] for x in results]
+    
+    ensure_dir(output_dir)
+    
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+    
+    color1 = 'tab:red'
+    ax1.set_xlabel('V Parameter (Log Scale)')
+    ax1.set_ylabel('Total Carbon Emission (g)', color=color1)
+    ax1.plot(v_vals, carbons, marker='o', color=color1, label='Carbon Emission')
+    ax1.tick_params(axis='y', labelcolor=color1)
+    ax1.set_xscale('log')
+    ax1.grid(True, which="both", ls="--", alpha=0.5)
+    
+    ax2 = ax1.twinx()  
+    color2 = 'tab:blue'
+    ax2.set_ylabel('Total Queue Length (bits)', color=color2)  
+    ax2.plot(v_vals, queues, marker='s', color=color2, label='Queue Length')
+    ax2.tick_params(axis='y', labelcolor=color2)
+    
+    plt.title('Trade-off between Carbon Emission and Queue Length under varying V')
+    fig.tight_layout()  
+    plt.savefig(os.path.join(output_dir, 'tradeoff_V_dual_axis.png'), dpi=300)
+    plt.close()
+    
+    plt.figure(figsize=(8, 6))
+    plt.plot(carbons, queues, marker='^', linestyle='-', color='purple')
+    for i, txt in enumerate(v_vals):
+        plt.annotate(f'V={txt:.0e}', (carbons[i], queues[i]), textcoords="offset points", xytext=(0,10), ha='center', fontsize=9)
+    plt.xlabel('Total Carbon Emission (g)')
+    plt.ylabel('Total Queue Length (bits)')
+    plt.title('Pareto Trade-off: Carbon Emission vs Queue Length')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'tradeoff_pareto.png'), dpi=300)
+    plt.close()
+    
+    print(f"Trade-off plots successfully saved to {output_dir}")
 
 def plot_carbon_intensity(ci_history, figures_dir, config_data=None):
     """
@@ -230,6 +315,13 @@ def process_and_plot_simulation_details(csv_dir, figures_dir):
 
 if __name__ == "__main__":
     args = parse_arguments()
+
+    if args.plot_tradeoff:
+        if not args.tradeoff_data_dir:
+            print("Error: --tradeoff_data_dir is required for plotting trade-off.")
+            exit(1)
+        plot_tradeoff(args.tradeoff_data_dir, args.output_dir)
+        exit(0)
     
     figures_dir = os.path.join(args.output_dir, 'figures')
     ensure_dir(figures_dir)

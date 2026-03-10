@@ -405,8 +405,11 @@ class CloudEdgeEnvironment:
         return rate
     
     def _adjust_transmission_power(self, final_x_peer, final_x_cloud, final_t_peer, final_t_cloud, p_peer, p_cloud):
+        """
+        It would be adjusted only in scale mode
+        """
         total_tx_time = np.sum(final_t_peer) + final_t_cloud
-        if 0 < total_tx_time < Config.TIME_SLOT_DURATION:
+        if Config.TIME_SLOT_ADJUST == "scale" and 0 < total_tx_time < Config.TIME_SLOT_DURATION:
             scale_up_factor = Config.TIME_SLOT_DURATION / total_tx_time
             final_t_peer = final_t_peer * scale_up_factor
             final_t_cloud = final_t_cloud * scale_up_factor

@@ -9,7 +9,7 @@
 
 ### Test different V
 ```
-./V_test_exp.sh [Base_dir] [start exp V] [end exp V]
+./V_test_exp.sh [Base_dir] [start exp V] [start digit V] [end exp V] [start digit V]
 ./V_test_exp.sh -d
 ```
 
@@ -20,4 +20,4 @@
 |1hour||
 
 ### TODO
-+ Why edge queue len limit do not increace the carbon
+
