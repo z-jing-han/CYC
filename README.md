@@ -20,4 +20,4 @@
 |1hour||
 
 ### TODO
-
++ How get optimal in ao, two decision variable case?

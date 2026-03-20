@@ -15,6 +15,15 @@
         "channel_gain_cloud": 1e-12,
         "trade_off_V": 1e21
     },
+    "algorithms": {
+        "run_list": [
+            "DWPA", "DWPALF", "DWPAVO", "DWPAHF", "FIXTIMEDWPA", "CVXPY", "AODWPA", "DOLA22", "ICSOC19", "YCL24"
+        ],
+        "plot_groups": {
+            "dwpa": ["DWPA", "DWPALF", "DWPAVO", "DWPAHF", "FIXTIMEDWPA", "CVXPY", "AODWPA"],
+            "competitor": ["DWPA", "DOLA22", "YCL24", "ICSOC19"]
+        }
+    },
     "topology": {
         "description": "Adjacency matrix for Edge Servers",
         "matrix": [

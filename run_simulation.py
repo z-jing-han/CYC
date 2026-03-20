@@ -2,6 +2,7 @@ import numpy as np
 import argparse
 import os
 import sys
+import json
 
 # Project File
 from config import Config
@@ -11,6 +12,9 @@ from logger_utils import SimulationLogger
 
 # DWPA Solver File
 from dwpa_solver.dwpa import DWPASolver
+from dwpa_solver.fixtimedwpa import FIXTIMEDWPASolver
+from dwpa_solver.AO import AOSolver
+from dwpa_solver.cvxpy import CVXPYSolver
 
 # Other Competitors
 from dwpa_competitor.dola22_solver import DOLA22Solver
@@ -60,6 +64,9 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
         'DWPALF': lambda env: DWPASolver(env, 'LF'),
         'DWPAVO': lambda env: DWPASolver(env, 'VO'),
         'DWPAHF': lambda env: DWPASolver(env, 'HF'),
+        'FIXTIMEDWPA': FIXTIMEDWPASolver,
+        'AODWPA': AOSolver,
+        'CVXPY': CVXPYSolver,
         'DOLA22': DOLA22Solver,
         'ICSOC19': ICSOC19Solver,
         'YCL24': YCL24Solver
@@ -116,20 +123,18 @@ if __name__ == "__main__":
         if not os.path.exists(args.output_dir):
             os.makedirs(args.output_dir)
         
-        # 5. Run Simulations
-        algorithms_to_run = [
-            'DWPA', 'DWPALF', 'DWPAVO', 'DWPAHF',
-            'DOLA22', 'ICSOC19', 'YCL24'
-        ]
+        with open(files['config'], 'r', encoding='utf-8') as f:
+            config_data = json.load(f)
         
-        results = {}
-        for algo in algorithms_to_run:
-            c, q = run_simulation(algo, args.output_dir)
-            results[algo] = {'carbon': c, 'queue': q}
+        algorithms_to_run = config_data.get('algorithms', {}).get('run_list', [])
         
+        if not algorithms_to_run:
+             print("[Warning] No algorithms specified in config.json under 'algorithms.run_list'.")
+
         print("="*63)
         for algo in algorithms_to_run:
-            print(f"{algo:<10}| Carbon: {results[algo]['carbon']:10.4f} g | Avg Queue: {results[algo]['queue'] / Config.MB_TO_BITS:10.2f} MB")
+            c, q = run_simulation(algo, args.output_dir)
+            print(f"{algo:<11}| Carbon: {c:10.4f} g | Avg Queue: {q / Config.MB_TO_BITS:10.2f} MB")
         print("="*63)
         
     except FileNotFoundError as e:

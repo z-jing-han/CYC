@@ -197,11 +197,10 @@ def get_algorithm_name(filename):
         return name.replace('stats_', '')
     return name
 
-def process_and_plot_simulation_details(csv_dir, figures_dir):
-    algo_groups = {
-        'dwpa': ['DWPA', 'DWPALF', 'DWPAVO', 'DWPAHF'],
-        'competitor': ['DWPA', 'DOLA22', 'YCL24', 'ICSOC19']
-    }
+def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
+    algo_groups = config_data.get('algorithms', {}).get('plot_groups', {
+        'default': ['DWPA']
+    })
 
     # find all csv
     csv_files = glob.glob(os.path.join(csv_dir, "*.csv"))
@@ -354,6 +353,6 @@ if __name__ == "__main__":
         print("Skipping Carbon Intensity Trace plot.")
     
     if os.path.exists(stats_csv_dir):
-        process_and_plot_simulation_details(stats_csv_dir, figures_dir)
+        process_and_plot_simulation_details(stats_csv_dir, figures_dir, config_data_for_plot)
     else:
         print(f"[Error] CSV directory not found: {stats_csv_dir}")
