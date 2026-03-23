@@ -17,10 +17,10 @@
     },
     "algorithms": {
         "run_list": [
-            "DWPA", "DWPALF", "DWPAVO", "DWPAHF", "FIXTIMEDWPA", "CVXPY", "AODWPA", "DOLA22", "ICSOC19", "YCL24"
+            "DWPA", "DWPALF", "DWPAVO", "DWPAHF", "FIXTIMEDWPA", "GUROBI", "AODWPA", "DOLA22", "ICSOC19", "YCL24"
         ],
         "plot_groups": {
-            "dwpa": ["DWPA", "DWPALF", "DWPAVO", "DWPAHF", "FIXTIMEDWPA", "CVXPY", "AODWPA"],
+            "dwpa": ["DWPA", "DWPALF", "DWPAVO", "DWPAHF", "FIXTIMEDWPA", "GUROBI", "AODWPA"],
             "competitor": ["DWPA", "DOLA22", "YCL24", "ICSOC19"]
         }
     },

@@ -14,7 +14,7 @@ from logger_utils import SimulationLogger
 from dwpa_solver.dwpa import DWPASolver
 from dwpa_solver.fixtimedwpa import FIXTIMEDWPASolver
 from dwpa_solver.AO import AOSolver
-from dwpa_solver.cvxpy import CVXPYSolver
+from dwpa_solver.gurobi import GurobiSolver
 
 # Other Competitors
 from dwpa_competitor.dola22_solver import DOLA22Solver
@@ -54,7 +54,8 @@ def validate_input_files(input_dir):
 def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
     logger = SimulationLogger(algorithm, output_dir)
     data_loader = DataLoader()
-    env = CloudEdgeEnvironment(data_loader, logger=logger)
+    warning_file_path = os.path.join(output_dir, f"logs/{algorithm}_constraint_warnings.log")
+    env = CloudEdgeEnvironment(data_loader, warning_log_file=warning_file_path, logger=logger)
     total_steps = env.max_time_steps
     
     solver = None
@@ -66,7 +67,7 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
         'DWPAHF': lambda env: DWPASolver(env, 'HF'),
         'FIXTIMEDWPA': FIXTIMEDWPASolver,
         'AODWPA': AOSolver,
-        'CVXPY': CVXPYSolver,
+        'GUROBI': GurobiSolver,
         'DOLA22': DOLA22Solver,
         'ICSOC19': ICSOC19Solver,
         'YCL24': YCL24Solver
