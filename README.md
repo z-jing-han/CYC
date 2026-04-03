@@ -20,3 +20,4 @@
 |1hour||
 
 ### TODO
++ Isolate maddpg training parameter to config

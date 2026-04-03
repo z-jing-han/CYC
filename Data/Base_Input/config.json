@@ -17,11 +17,12 @@
     },
     "algorithms": {
         "run_list": [
-            "DWPA", "DWPALF", "DWPAVO", "DWPAHF", "FIXTIMEDWPA", "GUROBI", "AODWPA", "DOLA22", "ICSOC19", "YCL24"
+            "DWPA", "DWPALF", "DWPAVO", "DWPAHF", "FIXTIME", "GUROBI", "AO", "DOLA22", "ICSOC19", "YCL24", "MARL"
         ],
         "plot_groups": {
-            "dwpa": ["DWPA", "DWPALF", "DWPAVO", "DWPAHF", "FIXTIMEDWPA", "GUROBI", "AODWPA"],
-            "competitor": ["DWPA", "DOLA22", "YCL24", "ICSOC19"]
+            "dwpa": ["DWPA", "DWPALF", "DWPAVO", "DWPAHF", "FIXTIME", "GUROBI", "AO"],
+            "competitor": ["DWPA", "DOLA22", "YCL24", "ICSOC19"],
+            "marl": ["MARL", "AO"]
         }
     },
     "topology": {
@@ -49,6 +50,11 @@
     "data_arrival_model": {
         "description": "Configuration for data arrival models",
         "selected_model": "on-off-model",
+        "surge_period": {
+            "start_slot": 600,
+            "end_slot": 800,
+            "multiplier": 2.0
+        },
         "models": {
             "on-off-model": {
                 "transition_probability": {

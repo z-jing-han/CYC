@@ -6,9 +6,10 @@ class CloudEdgeEnvironment:
         self.task_data, self.ci_hist_raw, self.ci_pred_raw, self.edge_graph = data_loader.load_data()
         self.logger = logger
 
-        self.warning_log_file = warning_log_file if warning_log_file else "default_warnings.log"
-        with open(self.warning_log_file, "w", encoding="utf-8") as f:
-            f.write("=== Simulation Constraint Warnings Log ===\n")
+        self.warning_log_file = warning_log_file
+        if self.warning_log_file:
+            with open(self.warning_log_file, "w", encoding="utf-8") as f:
+                f.write("=== Simulation Constraint Warnings Log ===\n")
         
         self.num_edge = Config.NUM_EDGE_SERVERS
         self.time_step = 0
@@ -40,6 +41,8 @@ class CloudEdgeEnvironment:
             self.neighbors_map[i] = n_indices
     
     def _log_warning(self, message):
+        if not self.warning_log_file:
+            return
         with open(self.warning_log_file, "a", encoding="utf-8") as f:
             f.write(message + "\n")
 

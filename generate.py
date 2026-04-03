@@ -35,6 +35,12 @@ def generate_traffic_data(config_path, output_path):
         
         model_config = config.get('data_arrival_model', {})
         selected_model = model_config.get('selected_model', 'poisson-distribution')
+
+        surge_config = model_config.get('surge_period', {})
+        surge_start = surge_config.get('start_slot', -1)
+        surge_end = surge_config.get('end_slot', -1)
+        surge_multiplier = surge_config.get('multiplier', 1.0)
+
     except AttributeError:
         print("Error: Invalid config structure.")
         return
@@ -57,7 +63,11 @@ def generate_traffic_data(config_path, output_path):
             server_trace = []
             is_on = random.choice([True, False])
             
-            for _ in range(num_timeslots):
+            for t in range(num_timeslots):
+                current_multiplier = surge_multiplier if surge_start <= t <= surge_end else 1.0
+                current_on_mean = on_mean * current_multiplier
+                current_off_mean = off_mean * current_multiplier
+
                 current_val = 0.0
                 if is_on:
                     current_val = np.random.normal(on_mean, on_std)
@@ -75,14 +85,24 @@ def generate_traffic_data(config_path, output_path):
     elif selected_model == 'poisson-distribution':
         params = model_config['models'].get('poisson-distribution', {'lambda_bits': 5e6})
         lam = params.get('lambda_bits', 5e6)
-
+        
         for server_idx in range(num_servers):
-            server_trace = np.random.poisson(lam, num_timeslots)
+            server_trace = []
+            for t in range(num_timeslots):
+                current_multiplier = surge_multiplier if surge_start <= t <= surge_end else 1.0
+                current_lam = lam * current_multiplier
+                server_trace.append(np.random.poisson(current_lam))
             all_servers_data.append(server_trace)
+        
     elif selected_model == 'const-bit-rate':
         params = model_config['models']['const-bit-rate']
         bit_rate = params['bit-rate']
-        all_servers_data = [[bit_rate for _ in range(num_timeslots)] for _ in range(num_servers)]
+        for server_idx in range(num_servers):
+            server_trace = []
+            for t in range(num_timeslots):
+                current_multiplier = surge_multiplier if surge_start <= t <= surge_end else 1.0
+                server_trace.append(int(bit_rate * current_multiplier))
+            all_servers_data.append(server_trace)
     else:
         print(f"Error: Unknown select model {selected_model}")
         return

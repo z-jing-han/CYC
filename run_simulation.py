@@ -12,14 +12,19 @@ from logger_utils import SimulationLogger
 
 # DWPA Solver File
 from dwpa_solver.dwpa import DWPASolver
-from dwpa_solver.fixtimedwpa import FIXTIMEDWPASolver
-from dwpa_solver.AO import AOSolver
-from dwpa_solver.gurobi import GurobiSolver
 
 # Other Competitors
 from dwpa_competitor.dola22_solver import DOLA22Solver
 from dwpa_competitor.icsoc19_solver import ICSOC19Solver
 from dwpa_competitor.ycl24_solver import YCL24Solver
+
+# DWPA Optimization Version
+from dwpa_opt.fixtime import FIXTIMESolver
+from dwpa_opt.AO import AOSolver
+from dwpa_opt.gurobi import GurobiSolver
+
+# MARL Method
+from marl.marl import MARLSolver, run_marl_training
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Green MEC Simulation Runner")
@@ -65,16 +70,27 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
         'DWPALF': lambda env: DWPASolver(env, 'LF'),
         'DWPAVO': lambda env: DWPASolver(env, 'VO'),
         'DWPAHF': lambda env: DWPASolver(env, 'HF'),
-        'FIXTIMEDWPA': FIXTIMEDWPASolver,
-        'AODWPA': AOSolver,
+        'FIXTIME': FIXTIMESolver,
+        'AO': AOSolver,
         'GUROBI': GurobiSolver,
         'DOLA22': DOLA22Solver,
         'ICSOC19': ICSOC19Solver,
-        'YCL24': YCL24Solver
+        'YCL24': YCL24Solver,
+        'MARL': MARLSolver
     }
 
     if algorithm in solver_classes:
         solver = solver_classes[algorithm](env)
+
+        # MARL Method load the training wegiht
+        if algorithm == 'MARL':
+            weights_path = os.path.join(output_dir, "marl_weights.pth")
+            if os.path.exists(weights_path):
+                solver.load_weights(weights_path)
+                solver.is_training = False
+            else:
+                raise FileNotFoundError(f"MARL Weight File Not found: {weights_path}. Ensure training is finished.")
+
     else:
         raise ValueError(f"Unknown algorithm: {algorithm}")
     
@@ -131,6 +147,14 @@ if __name__ == "__main__":
         
         if not algorithms_to_run:
              print("[Warning] No algorithms specified in config.json under 'algorithms.run_list'.")
+        
+        # MARL Offloading Training
+        marl_weights_path = os.path.join(args.output_dir, "marl_weights.pth")
+        if "MARL" in algorithms_to_run and not os.path.exists(marl_weights_path):
+            train_logger = SimulationLogger("MARL_Train", args.output_dir)
+            train_env = CloudEdgeEnvironment(DataLoader(), logger=train_logger)
+            train_solver = MARLSolver(train_env)
+            run_marl_training(train_env, train_solver, save_path=marl_weights_path, episodes=15)
 
         print("="*63)
         for algo in algorithms_to_run:

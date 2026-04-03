@@ -224,7 +224,8 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
 
     data_store = {
         'Carbon': {k: {} for k in entities.keys()},
-        'Queue': {k: {} for k in entities.keys()}
+        'Queue': {k: {} for k in entities.keys()},
+        'Fairness': {'Total': {}}  # 系統層級指標
     }
     
     time_index = None
@@ -246,12 +247,22 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
                 if queue_col in df.columns:
                     data_store['Queue'][entity_key][algo_name] = df[queue_col] / (8 * 1024 * 1024)
 
+            # Edge Servers Jain's Fairness Index
+            edge_q_cols = [c for c in df.columns if 'Q_Post(bits)' in c and 'Edge' in c]
+            if edge_q_cols:
+                sum_q = df[edge_q_cols].sum(axis=1)
+                sum_q_sq = (df[edge_q_cols] ** 2).sum(axis=1)
+                n_edges = len(edge_q_cols)
+                jfi = (sum_q ** 2) / (n_edges * sum_q_sq)
+                jfi = jfi.fillna(1.0)
+                data_store['Fairness']['Total'][algo_name] = jfi
+
         except Exception as e:
             print(f"Error processing file {fpath}: {e}")
     
     def plot_metric_group(metric_name, output_folder, y_label, file_suffix, allowed_algos):
         """
-        metric_name: 'Carbon' or 'Queue'
+        metric_name: 'Carbon', 'Queue', or 'Fairness'
         output_folder: specific folder path (e.g. figures/dwpa/Carbon_Emission)
         allowed_algos: list of algorithms to plot for this group
         """
@@ -276,6 +287,10 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
             plt.ylabel(y_label, fontsize=12)
             plt.legend(title="Algorithm", loc='upper right', frameon=True)
             plt.grid(True, linestyle='--', alpha=0.7)
+            
+            if metric_name == 'Fairness':
+                plt.ylim(-0.05, 1.05)
+                
             plt.tight_layout()
 
             filename = f"{entity_key}_{file_suffix}.png"
@@ -292,9 +307,11 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
         group_base_dir = os.path.join(figures_dir, group_name)
         carbon_dir = os.path.join(group_base_dir, 'Carbon_Emission')
         queue_dir = os.path.join(group_base_dir, 'Queue_Len')
+        fairness_dir = os.path.join(group_base_dir, 'Queue_Fairness') # 新增 Fairness 資料夾
         
         ensure_dir(carbon_dir)
         ensure_dir(queue_dir)
+        ensure_dir(fairness_dir)
 
         plot_metric_group(
             metric_name='Carbon',
@@ -309,6 +326,14 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
             output_folder=queue_dir,
             y_label='Queue Length (MB)',
             file_suffix='queue',
+            allowed_algos=allowed_list
+        )
+        
+        plot_metric_group(
+            metric_name='Fairness',
+            output_folder=fairness_dir,
+            y_label="Jain's Fairness Index",
+            file_suffix='fairness',
             allowed_algos=allowed_list
         )
 
