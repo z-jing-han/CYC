@@ -25,6 +25,15 @@
             "marl": ["MARL", "AO"]
         }
     },
+    "marl_settings": {
+        "lr_actor": 1e-4,
+        "lr_critic": 1e-3,
+        "gamma": 0.99,
+        "batch_size": 64,
+        "episodes": 15,
+        "buffer_size": 10000,
+        "exploration_noise": 0.05
+    },
     "topology": {
         "description": "Adjacency matrix for Edge Servers",
         "matrix": [

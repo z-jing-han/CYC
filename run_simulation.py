@@ -154,7 +154,7 @@ if __name__ == "__main__":
             train_logger = SimulationLogger("MARL_Train", args.output_dir)
             train_env = CloudEdgeEnvironment(DataLoader(), logger=train_logger)
             train_solver = MARLSolver(train_env)
-            run_marl_training(train_env, train_solver, save_path=marl_weights_path, episodes=15)
+            run_marl_training(train_env, train_solver, save_path=marl_weights_path)
 
         print("="*63)
         for algo in algorithms_to_run:

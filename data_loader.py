@@ -59,6 +59,16 @@ class DataLoader:
             Config.G_IC = config_data['system_settings']['channel_gain_cloud']
             Config.V = config_data['system_settings']['trade_off_V']
 
+            if 'marl_settings' in config_data:
+                marl_cfg = config_data['marl_settings']
+                Config.MARL_LR_ACTOR = marl_cfg.get('lr_actor', 1e-4)
+                Config.MARL_LR_CRITIC = marl_cfg.get('lr_critic', 1e-3)
+                Config.MARL_GAMMA = marl_cfg.get('gamma', 0.99)
+                Config.MARL_BATCH_SIZE = marl_cfg.get('batch_size', 64)
+                Config.MARL_EPISODES = marl_cfg.get('episodes', 15)
+                Config.MARL_BUFFER_SIZE = marl_cfg.get('buffer_size', 10000)
+                Config.MARL_NOISE = marl_cfg.get('exploration_noise', 0.05)
+
             for i in range(Config.NUM_EDGE_SERVERS):
                 Config.EEDGE_Q_CAPACITY.append(config_data['servers']['edge_servers'][i]['max_capacity_bits'])
 

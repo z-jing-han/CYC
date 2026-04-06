@@ -43,11 +43,15 @@ class CriticNetwork(nn.Module):
         return self.fc(x)
 
 class MARLSolver:
-    def __init__(self, env, variant='default', lr_actor=1e-4, lr_critic=1e-3, gamma=0.99):
+    def __init__(self, env, variant='default'):
         self.env = env
         self.variant = variant
         self.num_edge = env.num_edge
-        self.gamma = gamma
+        
+        self.gamma = getattr(Config, 'MARL_GAMMA', 0.99)
+        lr_actor = getattr(Config, 'MARL_LR_ACTOR', 1e-4)
+        lr_critic = getattr(Config, 'MARL_LR_CRITIC', 1e-3)
+        self.noise_std = getattr(Config, 'MARL_NOISE', 0.05)
         
         self.agents = {}
         for i in range(self.num_edge):
@@ -112,7 +116,7 @@ class MARLSolver:
             with torch.no_grad():
                 action_tensor = self.agents[i]['actor'](obs_tensor)
                 if getattr(self, 'is_training', False):
-                    noise = torch.normal(0, 0.05, size=action_tensor.size(), device=device)
+                    noise = torch.normal(0, self.noise_std, size=action_tensor.size(), device=device)
                     action_tensor = torch.clamp(action_tensor + noise, 0.0, 1.0)
                 action = action_tensor.squeeze(0).cpu().detach().numpy()
             
@@ -209,9 +213,13 @@ def calculate_rewards(state, next_state, carbon, V_param=1.0):
 from collections import deque
 import random
 
-def run_marl_training(env, solver, save_path, episodes=500, batch_size=64):
+def run_marl_training(env, solver, save_path):
+    # Config parameter
+    episodes = getattr(Config, 'MARL_EPISODES', 500)
+    batch_size = getattr(Config, 'MARL_BATCH_SIZE', 64)
+    buffer_size = getattr(Config, 'MARL_BUFFER_SIZE', 10000)
     # Simple Replay Buffer
-    replay_buffer = {i: deque(maxlen=10000) for i in range(env.num_edge)}
+    replay_buffer = {i: deque(maxlen=buffer_size) for i in range(env.num_edge)}
     
     for ep in range(episodes):
         state = env.reset()
