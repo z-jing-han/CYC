@@ -68,6 +68,7 @@ class DataLoader:
                 Config.MARL_EPISODES = marl_cfg.get('episodes', 15)
                 Config.MARL_BUFFER_SIZE = marl_cfg.get('buffer_size', 10000)
                 Config.MARL_NOISE = marl_cfg.get('exploration_noise', 0.05)
+                Config.MARL_NOISE = marl_cfg.get('MARL_V', 1e11)
 
             for i in range(Config.NUM_EDGE_SERVERS):
                 Config.EEDGE_Q_CAPACITY.append(config_data['servers']['edge_servers'][i]['max_capacity_bits'])

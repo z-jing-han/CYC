@@ -32,7 +32,8 @@
         "batch_size": 64,
         "episodes": 15,
         "buffer_size": 10000,
-        "exploration_noise": 0.05
+        "exploration_noise": 0.05,
+        "MARL_V": 1e11
     },
     "topology": {
         "description": "Adjacency matrix for Edge Servers",
