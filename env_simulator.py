@@ -209,7 +209,9 @@ class CloudEdgeEnvironment:
             'q_avg_total': np.mean(self.queues_edge),
             'processed_local': np.mean(actual_ec),
             'processed_cloud': np.mean(cloud_proc),
-            'offloaded_cloud': np.mean(actual_x_cloud)
+            'offloaded_cloud': np.mean(actual_x_cloud),
+            'edge_metrics': [{'carbon': edge_carbon[i]} for i in range(self.num_edge)],
+            'cloud_metrics': [{'carbon': cloud_carbon[i]} for i in range(self.num_edge)]
         }
         
         if self.logger:

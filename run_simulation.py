@@ -24,7 +24,8 @@ from dwpa_opt.AO import AOSolver
 from dwpa_opt.gurobi import GurobiSolver
 
 # MARL Method
-from marl.marl import MARLSolver, run_marl_training
+from marl_solver.action_decoder import XPDecoder, XTDecoder
+from marl_solver.maddpg_solver import MADDPGSolver, run_marl_training
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Green MEC Simulation Runner")
@@ -56,16 +57,79 @@ def validate_input_files(input_dir):
     
     return found_paths
 
-def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
-    logger = SimulationLogger(algorithm, output_dir)
+
+def setup_marl_solver(algorithm_config_str, env, output_dir):
+    parts = algorithm_config_str.split('_')
+    algo_name = parts[0]
+    decoder_name = parts[1] if len(parts) > 1 else 'XT'
+    use_ctde = True if len(parts) > 2 and parts[2] == 'CTDE' else False
+
+    available_decoders = {
+        'XP': XPDecoder(),
+        'XT': XTDecoder()
+    }
+
+    available_marl_solvers = {
+        'MADDPG': MADDPGSolver,
+        # 'MAPPO': MAPPOSolver
+    }
+
+    if algo_name not in available_marl_solvers:
+        raise ValueError(f"Unknown marl algorithm: {algo_name}")
+    if decoder_name not in available_decoders:
+        raise ValueError(f"Unknown decoder: {decoder_name}")
+
+    decoder_instance = available_decoders[decoder_name]
+    SolverClass = available_marl_solvers[algo_name]
+
+    solver = SolverClass(env=env, decoder=decoder_instance, use_ctde=use_ctde)
+
+    weights_path = os.path.join(output_dir, solver.weight_filename)
+    if os.path.exists(weights_path):
+        solver.load_weights(output_dir)
+        solver.is_training = False 
+    else:
+        raise FileNotFoundError(f"Can't find the weight {weights_path}")
+        
+    return solver
+
+
+def check_and_train_marl(algorithms_to_run, output_dir):
+    for algo_config_str in algorithms_to_run:
+        if algo_config_str.startswith("MA"):
+            parts = algo_config_str.split('_')
+            algo_name = parts[0]
+            decoder_name = parts[1] if len(parts) > 1 else 'XT'
+            use_ctde = True if len(parts) > 2 and parts[2] == 'CTDE' else False
+            
+            train_logger = SimulationLogger(f"{algo_config_str}_Train", output_dir)
+            train_env = CloudEdgeEnvironment(DataLoader(), logger=train_logger)
+            
+            train_decoder = XPDecoder() if decoder_name == 'XP' else XTDecoder()
+            
+            if algo_name == 'MADDPG':
+                train_solver = MADDPGSolver(train_env, train_decoder, use_ctde)
+            else:
+                print(f"[Warning] Unknown algorithm name {algo_name}")
+                continue
+            
+            expected_weight_path = os.path.join(output_dir, train_solver.weight_filename)
+            
+            if not os.path.exists(expected_weight_path):
+                print(f"[Training] Start training for {algo_config_str}...")
+                run_marl_training(train_env, train_solver, output_dir)
+            
+            train_logger.close()
+
+def run_simulation(algorithm_config_str, output_dir='Base_Output'):
+    logger = SimulationLogger(algorithm_config_str, output_dir)
     data_loader = DataLoader()
-    warning_file_path = os.path.join(output_dir, f"logs/{algorithm}_constraint_warnings.log")
+    warning_file_path = os.path.join(output_dir, f"logs/{algorithm_config_str}_constraint_warnings.log")
     env = CloudEdgeEnvironment(data_loader, warning_log_file=warning_file_path, logger=logger)
-    total_steps = env.max_time_steps
     
     solver = None
 
-    solver_classes = {
+    traditional_solver_classes = {
         'DWPA': DWPASolver,
         'DWPALF': lambda env: DWPASolver(env, 'LF'),
         'DWPAVO': lambda env: DWPASolver(env, 'VO'),
@@ -75,46 +139,33 @@ def run_simulation(algorithm='DWPA', output_dir='Base_Output'):
         'GUROBI': GurobiSolver,
         'DOLA22': DOLA22Solver,
         'ICSOC19': ICSOC19Solver,
-        'YCL24': YCL24Solver,
-        'MARL': MARLSolver
+        'YCL24': YCL24Solver
     }
 
-    if algorithm in solver_classes:
-        solver = solver_classes[algorithm](env)
-
-        # MARL Method load the training wegiht
-        if algorithm == 'MARL':
-            weights_path = os.path.join(output_dir, "marl_weights.pth")
-            if os.path.exists(weights_path):
-                solver.load_weights(weights_path)
-                solver.is_training = False
-            else:
-                raise FileNotFoundError(f"MARL Weight File Not found: {weights_path}. Ensure training is finished.")
-
+    if algorithm_config_str.startswith("MA"):
+        solver = setup_marl_solver(algorithm_config_str, env, output_dir)
     else:
-        raise ValueError(f"Unknown algorithm: {algorithm}")
+        if algorithm_config_str in traditional_solver_classes:
+            solver = traditional_solver_classes[algorithm_config_str](env)
+        else:
+            raise ValueError(f"Unknown algorithm: {algorithm_config_str}")
     
-    # Execution Loop
     state = env.reset()
     history_carbon, history_q = [], []
     done = False
-    step_count = 0
     
     while not done:
-        # Get Action
         if solver is not None:
             decisions = solver.solve(state)
         else:
-            raise ValueError(f"Solver is None, Unkown Solver, algorithm is: {algorithm}")
-            
-        # Environment Step
+            raise ValueError(f"Solver is None, Unknown Solver: {algorithm_config_str}")
+        
         next_state, carbon, done, info = env.step(decisions)
         
         history_carbon.append(carbon)
         history_q.append(info['q_avg_total']) 
                
         state = next_state
-        step_count += 1
         
     total_carbon = sum(history_carbon)
     avg_q = np.mean(history_q)
@@ -148,18 +199,14 @@ if __name__ == "__main__":
         if not algorithms_to_run:
              print("[Warning] No algorithms specified in config.json under 'algorithms.run_list'.")
         
-        # MARL Offloading Training
-        marl_weights_path = os.path.join(args.output_dir, "marl_weights.pth")
-        if "MARL" in algorithms_to_run and not os.path.exists(marl_weights_path):
-            train_logger = SimulationLogger("MARL_Train", args.output_dir)
-            train_env = CloudEdgeEnvironment(DataLoader(), logger=train_logger)
-            train_solver = MARLSolver(train_env)
-            run_marl_training(train_env, train_solver, save_path=marl_weights_path)
+        # 5. traing marl model
+        check_and_train_marl(algorithms_to_run, args.output_dir)
 
+        # 6. Run Simulations
         print("="*63)
         for algo in algorithms_to_run:
             c, q = run_simulation(algo, args.output_dir)
-            print(f"{algo:<11}| Carbon: {c:10.4f} g | Avg Queue: {q / Config.MB_TO_BITS:10.2f} MB")
+            print(f"{algo:<20}| Carbon: {c:10.4f} g | Avg Queue: {q / Config.MB_TO_BITS:10.2f} MB")
         print("="*63)
         
     except FileNotFoundError as e:
