@@ -157,6 +157,10 @@ def run_simulation(algorithm_config_str, output_dir='Base_Output'):
             raise ValueError(f"Unknown algorithm: {algorithm_config_str}")
     
     state = env.reset()
+
+    if Config.OBSERVATION_PREV and hasattr(solver, 'reset_internal_state'):
+        solver.reset_internal_state(state['Q_edge'])
+
     history_carbon, history_q = [], []
     done = False
     

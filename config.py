@@ -39,7 +39,7 @@ class Config:
     # --- Local Queue Capacity ---
     EEDGE_Q_CAPACITY = []
 
-    # MARL
+    # MARL Related
     MARL_LR_ACTOR = 1e-4
     MARL_LR_CRITIC = 1e-3
     MARL_GAMMA = 0.99
@@ -48,3 +48,4 @@ class Config:
     MARL_BUFFER_SIZE = 10000
     MARL_NOISE = 0.05
     MARL_V = 1e11
+    OBSERVATION_PREV = False

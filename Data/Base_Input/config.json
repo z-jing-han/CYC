@@ -33,7 +33,8 @@
         "episodes": 15,
         "buffer_size": 10000,
         "exploration_noise": 0.05,
-        "MARL_V": 1e11
+        "MARL_V": 1e11,
+        "Observation": "curr"
     },
     "topology": {
         "description": "Adjacency matrix for Edge Servers",

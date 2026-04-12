@@ -20,4 +20,3 @@
 |1hour||
 
 ### TODO
-+ adjust the $Q_j(t)$ to $Q_j(t-1)$

@@ -138,7 +138,10 @@ class MAPPOSolver(BaseMARLSolver):
             decisions['unclipped_actions'] = unclipped_actions
             decisions['log_probs'] = log_probs
             decisions['values'] = values
-            
+        
+        if Config.OBSERVATION_PREV:
+            self.prev_Q_edge = np.copy(state['Q_edge'])    
+        
         return decisions
 
     def train(self, rollouts):
@@ -212,6 +215,10 @@ def run_mappo_training(env, solver, output_dir):
 
     for ep in range(episodes):
         state = env.reset()
+
+        if Config.OBSERVATION_PREV:
+            solver.reset_internal_state(state['Q_edge'])
+
         done = False
         epoch_carbon = 0.0
         epoch_queue = []

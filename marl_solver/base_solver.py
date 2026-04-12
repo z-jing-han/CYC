@@ -50,6 +50,12 @@ class BaseMARLSolver:
         self.noise_std = getattr(Config, 'MARL_NOISE', 0.05)
         self.is_training = True
         self.agents = {}
+
+        if Config.OBSERVATION_PREV:
+            self.prev_Q_edge = None
+    
+    def reset_internal_state(self, initial_Q_edge):
+        self.prev_Q_edge = np.copy(initial_Q_edge)
         
     def _extract_obs(self, state, agent_id):
         Q_edge = state['Q_edge']
@@ -64,9 +70,15 @@ class BaseMARLSolver:
             CI_edge[agent_id],
             CI_cloud[agent_id]
         ]
+
+        if Config.OBSERVATION_PREV and self.prev_Q_edge is None:
+            self.prev_Q_edge = np.copy(state['Q_edge'])
         
         for neighbor_id in neighbors:
-            obs.append(Q_edge[neighbor_id])
+            if Config.OBSERVATION_PREV:
+                obs.append(self.prev_Q_edge[neighbor_id])
+            else:
+                obs.append(Q_edge[neighbor_id])
         
         raw_obs = np.array(obs, dtype=np.float32)
         normalizer = self.agents[agent_id]['obs_normalizer']
@@ -98,6 +110,10 @@ class BaseMARLSolver:
         
         decisions = self.decoder.decode(state, raw_actions, self.num_edge, self.env.neighbors_map)
         decisions['raw_actions'] = raw_actions
+
+        if Config.OBSERVATION_PREV:
+            self.prev_Q_edge = np.copy(state['Q_edge'])
+
         return decisions
 
     def save_weights(self, output_dir):
