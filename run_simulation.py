@@ -24,8 +24,9 @@ from dwpa_opt.AO import AOSolver
 from dwpa_opt.gurobi import GurobiSolver
 
 # MARL Method
-from marl_solver.action_decoder import XPDecoder, XTDecoder
+from marl_solver.action_decoder import XPDecoder, XTDecoder, XTRDecoder
 from marl_solver.maddpg_solver import MADDPGSolver, run_marl_training
+from marl_solver.mappo_solver import MAPPOSolver, run_mappo_training
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Green MEC Simulation Runner")
@@ -66,12 +67,13 @@ def setup_marl_solver(algorithm_config_str, env, output_dir):
 
     available_decoders = {
         'XP': XPDecoder(),
-        'XT': XTDecoder()
+        'XT': XTDecoder(),
+        'XTR': XTRDecoder()
     }
 
     available_marl_solvers = {
         'MADDPG': MADDPGSolver,
-        # 'MAPPO': MAPPOSolver
+        'MAPPO': MAPPOSolver
     }
 
     if algo_name not in available_marl_solvers:
@@ -102,13 +104,19 @@ def check_and_train_marl(algorithms_to_run, output_dir):
             decoder_name = parts[1] if len(parts) > 1 else 'XT'
             use_ctde = True if len(parts) > 2 and parts[2] == 'CTDE' else False
             
-            train_logger = SimulationLogger(f"{algo_config_str}_Train", output_dir)
-            train_env = CloudEdgeEnvironment(DataLoader(), logger=train_logger)
+            train_env = CloudEdgeEnvironment(DataLoader())
             
-            train_decoder = XPDecoder() if decoder_name == 'XP' else XTDecoder()
+            if decoder_name == 'XP': train_decoder = XPDecoder()
+            elif decoder_name == 'XT': train_decoder = XTDecoder()
+            elif decoder_name == 'XTR': train_decoder = XTRDecoder()
+            else: train_decoder = XTDecoder()
             
             if algo_name == 'MADDPG':
                 train_solver = MADDPGSolver(train_env, train_decoder, use_ctde)
+                training_func = run_marl_training
+            elif algo_name == 'MAPPO':
+                train_solver = MAPPOSolver(train_env, train_decoder, use_ctde)
+                training_func = run_mappo_training
             else:
                 print(f"[Warning] Unknown algorithm name {algo_name}")
                 continue
@@ -117,10 +125,8 @@ def check_and_train_marl(algorithms_to_run, output_dir):
             
             if not os.path.exists(expected_weight_path):
                 print(f"[Training] Start training for {algo_config_str}...")
-                run_marl_training(train_env, train_solver, output_dir)
+                training_func(train_env, train_solver, output_dir)
             
-            train_logger.close()
-
 def run_simulation(algorithm_config_str, output_dir='Base_Output'):
     logger = SimulationLogger(algorithm_config_str, output_dir)
     data_loader = DataLoader()

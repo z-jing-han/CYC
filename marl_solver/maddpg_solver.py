@@ -54,20 +54,28 @@ class MADDPGSolver(BaseMARLSolver):
         lr_actor = getattr(Config, 'MARL_LR_ACTOR', 1e-4)
         lr_critic = getattr(Config, 'MARL_LR_CRITIC', 1e-3)
         
+        # 1. Precompute the global dimensions required for CTDE
+        self.global_obs_dim = 0
+        self.global_action_dim = 0
+        for i in range(self.num_edge):
+            num_neighbors = len(env.neighbors_map.get(i, []))
+            self.global_obs_dim += (4 + num_neighbors)
+            self.global_action_dim += self.decoder.get_action_dim(num_neighbors)
+        
         # Init Network
         for i in range(self.num_edge):
             neighbors = env.neighbors_map.get(i, [])
             num_neighbors = len(neighbors)
             
             obs_dim = 4 + num_neighbors
-            # Ask the decoder about the output dim of NN
             action_dim = self.decoder.get_action_dim(num_neighbors)
             
-            # For future CTDE expansion, the critic's obs_dim can be set to global_obs_dim
-            critic_obs_dim = obs_dim 
+            # Determine the Critic input dimension based on whether CTDE is enabled
+            critic_obs_dim = self.global_obs_dim if self.use_ctde else obs_dim 
+            critic_action_dim = self.global_action_dim if self.use_ctde else action_dim
             
             actor = ActorNetwork(obs_dim, action_dim).to(device)
-            critic = CriticNetwork(critic_obs_dim, action_dim).to(device)
+            critic = CriticNetwork(critic_obs_dim, critic_action_dim).to(device)
 
             actor_target = copy.deepcopy(actor).to(device)
             critic_target = copy.deepcopy(critic).to(device)
@@ -85,27 +93,63 @@ class MADDPGSolver(BaseMARLSolver):
                 'obs_normalizer': RunningMeanStd(shape=(obs_dim,)) 
             }
 
-    def train(self, agent_id, obs, action, reward, next_obs, done):
+    # 2. Receive a full batch dictionary to support global concatenation
+    def train(self, agent_id, b_obs_dict, b_act_dict, b_rew_dict, b_nobs_dict, b_done):
         agent = self.agents[agent_id]
         
-        # 1. Update Critic
+        obs = b_obs_dict[agent_id]
+        action = b_act_dict[agent_id]
+        reward = b_rew_dict[agent_id]
+        next_obs = b_nobs_dict[agent_id]
+
+        if self.use_ctde:
+            # Concatenate the states and actions of all agents
+            global_obs = torch.cat([b_obs_dict[j] for j in range(self.num_edge)], dim=1)
+            global_act = torch.cat([b_act_dict[j] for j in range(self.num_edge)], dim=1)
+            next_global_obs = torch.cat([b_nobs_dict[j] for j in range(self.num_edge)], dim=1)
+            
+            with torch.no_grad():
+                next_global_act_list = []
+                for j in range(self.num_edge):
+                    next_global_act_list.append(self.agents[j]['actor_target'](b_nobs_dict[j]))
+                next_global_act = torch.cat(next_global_act_list, dim=1)
+                
+                target_q = reward + (1 - b_done) * self.gamma * agent['critic_target'](next_global_obs, next_global_act)
+            
+            current_q = agent['critic'](global_obs, global_act)
+            
+        else:
+            # Decentralized
+            with torch.no_grad():
+                next_action = agent['actor_target'](next_obs)
+                target_q = reward + (1 - b_done) * self.gamma * agent['critic_target'](next_obs, next_action)
+            current_q = agent['critic'](obs, action)
+
+        # Update Critic
         agent['critic_opt'].zero_grad()
-        with torch.no_grad():
-            next_action = agent['actor_target'](next_obs)
-            target_q = reward + (1 - done) * self.gamma * agent['critic_target'](next_obs, next_action)
-        
-        current_q = agent['critic'](obs, action)
         critic_loss = F.mse_loss(current_q, target_q)
         critic_loss.backward()
         agent['critic_opt'].step()
         
-        # 2. Update Actor (DPG)
+        # Update Actor (DPG)
         agent['actor_opt'].zero_grad()
-        actor_loss = -agent['critic'](obs, agent['actor'](obs)).mean()
+        if self.use_ctde:
+            # updating the Actor, replace its specific action in global_act while keeping other agents' actions unchanged
+            curr_act_list = []
+            for j in range(self.num_edge):
+                if j == agent_id:
+                    curr_act_list.append(agent['actor'](obs))
+                else:
+                    curr_act_list.append(b_act_dict[j].detach())
+            new_global_act = torch.cat(curr_act_list, dim=1)
+            actor_loss = -agent['critic'](global_obs, new_global_act).mean()
+        else:
+            actor_loss = -agent['critic'](obs, agent['actor'](obs)).mean()
+            
         actor_loss.backward()
         agent['actor_opt'].step()
 
-        # 3. Soft Update Target Networks
+        # Soft Update Target Networks
         tau = 0.005
         for param, target_param in zip(agent['critic'].parameters(), agent['critic_target'].parameters()):
             target_param.data.copy_(tau * param.data + (1.0 - tau) * target_param.data)
@@ -115,11 +159,12 @@ class MADDPGSolver(BaseMARLSolver):
         
         return critic_loss.item(), actor_loss.item()
 
-def calculate_rewards(state, next_state, info, carbon, V_param=Config.MARL_V):
+def calculate_rewards(state, next_state, info, carbon, decisions, V_param=Config.MARL_V, penalty_weight=1e6):
     rewards = {}
     num_edge = len(state['Q_edge'])
     edge_metrics = info.get('edge_metrics', [])
     cloud_metrics = info.get('cloud_metrics', [])
+    penalties = decisions.get('penalties', np.zeros(num_edge))
 
     for i in range(num_edge):
         q_penalty = next_state['Q_edge'][i] + next_state['Q_cloud'][i]
@@ -128,15 +173,16 @@ def calculate_rewards(state, next_state, info, carbon, V_param=Config.MARL_V):
             carbon_penalty += edge_metrics[i]['carbon']
         if i < len(cloud_metrics):
             carbon_penalty += cloud_metrics[i]['carbon']
-        rewards[i] = - (q_penalty + V_param * carbon_penalty)
+        power_violation_penalty = penalty_weight * penalties[i]
+        
+        rewards[i] = - (q_penalty + V_param * carbon_penalty + power_violation_penalty)
+        
     return rewards
-
 
 def run_marl_training(env, solver, output_dir):
     csv_dir = os.path.join(output_dir, "csv")
     os.makedirs(csv_dir, exist_ok=True)
-
-    csv_filename = f"{solver.algo_name}_{solver.decoder.__class__.__name__}_Reward.csv"
+    csv_filename = f"{solver.algo_name}_{solver.decoder.__class__.__name__}_{'CTDE' if solver.use_ctde else 'Decentralized'}_Reward.csv"
     csv_path = os.path.join(csv_dir, csv_filename)
     
     training_history = [] 
@@ -145,7 +191,7 @@ def run_marl_training(env, solver, output_dir):
     batch_size = getattr(Config, 'MARL_BATCH_SIZE', 64)
     buffer_size = getattr(Config, 'MARL_BUFFER_SIZE', 10000)
     
-    replay_buffer = {i: deque(maxlen=buffer_size) for i in range(env.num_edge)}
+    replay_buffer = deque(maxlen=buffer_size)
     best_reward = -float('inf')
 
     for ep in range(episodes):
@@ -162,34 +208,35 @@ def run_marl_training(env, solver, output_dir):
             epoch_queue.append(np.mean(next_state['Q_edge'])) 
             epoch_carbon += carbon
 
-            rewards = calculate_rewards(state, next_state, info, carbon, V_param=Config.MARL_V)
+            rewards = calculate_rewards(state, next_state, info, carbon, decisions, V_param=Config.MARL_V)
             epoch_reward += sum(rewards.values())
             
+            obs_dict, act_dict, nobs_dict = {}, {}, {}
             for i in range(env.num_edge):
-                obs = solver._extract_obs(state, i).squeeze(0).cpu().numpy()
-                next_obs = solver._extract_obs(next_state, i).squeeze(0).cpu().numpy()
-                action = decisions['raw_actions'][i]
+                obs_dict[i] = solver._extract_obs(state, i).squeeze(0).cpu().numpy()
+                nobs_dict[i] = solver._extract_obs(next_state, i).squeeze(0).cpu().numpy()
+                act_dict[i] = decisions['raw_actions'][i]
                 
-                replay_buffer[i].append((obs, action, rewards[i], next_obs, float(done)))
+            replay_buffer.append((obs_dict, act_dict, rewards, nobs_dict, float(done)))
             
-            if len(replay_buffer[0]) >= batch_size:
+            if len(replay_buffer) >= batch_size:
+                batch = random.sample(replay_buffer, batch_size)
+                b_done = torch.tensor(np.array([x[4] for x in batch]), dtype=torch.float32).unsqueeze(1).to(device)
+                
+                b_obs_dict, b_act_dict, b_rew_dict, b_nobs_dict = {}, {}, {}, {}
                 for i in range(env.num_edge):
-                    batch = random.sample(replay_buffer[i], batch_size)
-                    
-                    b_obs = torch.tensor(np.array([x[0] for x in batch]), dtype=torch.float32).to(device)
-                    b_act = torch.tensor(np.array([x[1] for x in batch]), dtype=torch.float32).to(device)
-                    b_rew = torch.tensor(np.array([x[2] for x in batch]), dtype=torch.float32).unsqueeze(1).to(device)
-                    b_rew = b_rew / 1e10
-                    b_nobs = torch.tensor(np.array([x[3] for x in batch]), dtype=torch.float32).to(device)
-                    b_done = torch.tensor(np.array([x[4] for x in batch]), dtype=torch.float32).unsqueeze(1).to(device)
-                    
-                    solver.train(i, b_obs, b_act, b_rew, b_nobs, b_done)
+                    b_obs_dict[i] = torch.tensor(np.array([x[0][i] for x in batch]), dtype=torch.float32).to(device)
+                    b_act_dict[i] = torch.tensor(np.array([x[1][i] for x in batch]), dtype=torch.float32).to(device)
+                    b_rew_dict[i] = torch.tensor(np.array([x[2][i] for x in batch]), dtype=torch.float32).unsqueeze(1).to(device) / 1e10
+                    b_nobs_dict[i] = torch.tensor(np.array([x[3][i] for x in batch]), dtype=torch.float32).to(device)
+                
+                for i in range(env.num_edge):
+                    solver.train(i, b_obs_dict, b_act_dict, b_rew_dict, b_nobs_dict, b_done)
             
             state = next_state
         
         avg_q = np.mean(epoch_queue)
         training_history.append([ep + 1, epoch_reward, epoch_carbon, avg_q])
-        
         print(f"[{solver.algo_name}] Ep {ep+1:3d} | R: {epoch_reward:12.4f} | C: {epoch_carbon:10.4f} g | Avg Q: {avg_q:12.4f} bits")
 
         if epoch_reward > best_reward:

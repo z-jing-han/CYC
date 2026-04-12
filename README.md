@@ -20,6 +20,4 @@
 |1hour||
 
 ### TODO
-+ Rewrite the network method that match the constraint
-+ Add SAC, PPO, TD3 Method
-+ Add CTDE Method
++ adjust the $Q_j(t)$ to $Q_j(t-1)$

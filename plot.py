@@ -203,7 +203,7 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
     })
 
     # find all csv
-    csv_files = glob.glob(os.path.join(csv_dir, "*.csv"))
+    csv_files = glob.glob(os.path.join(csv_dir, "stats_*.csv"))
     if not csv_files:
         print(f"[Warning] No CSV files found in {csv_dir}")
         return
@@ -307,7 +307,7 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
         group_base_dir = os.path.join(figures_dir, group_name)
         carbon_dir = os.path.join(group_base_dir, 'Carbon_Emission')
         queue_dir = os.path.join(group_base_dir, 'Queue_Len')
-        fairness_dir = os.path.join(group_base_dir, 'Queue_Fairness') # 新增 Fairness 資料夾
+        fairness_dir = os.path.join(group_base_dir, 'Queue_Fairness')
         
         ensure_dir(carbon_dir)
         ensure_dir(queue_dir)

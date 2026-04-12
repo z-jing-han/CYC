@@ -95,7 +95,8 @@ class AOSolver:
                             val = (Config.BANDWIDTH * Config.G_IJ * term) / common_denom
                             if val > 1:
                                 x_val = Config.BANDWIDTH * t_p[j] * np.log2(val)
-                                max_transfer_p = (Q_edge[i] - Q_edge[j]) / 2.0 
+                                # MAX Transfer TAKS SIZE
+                                max_transfer_p = (Q_edge[i] - Q_edge[j])
                                 temp_x_p[j] = np.clip(x_val, 0, max_transfer_p)
                                 
                     if active_cloud and t_c >= 1e-9:
@@ -104,7 +105,8 @@ class AOSolver:
                             val_c = (Config.BANDWIDTH * Config.G_IC * term_c) / common_denom
                             if val_c > 1:
                                 x_c_val = Config.BANDWIDTH * t_c * np.log2(val_c)
-                                max_transfer_c = (Q_edge[i] - Q_cloud[i]) / 2.0
+                                # MAX Transfer TAKS SIZE
+                                max_transfer_c = (Q_edge[i] - Q_cloud[i])
                                 temp_x_c = np.clip(x_c_val, 0, max_transfer_c)
                                 
                     return temp_x_p, temp_x_c

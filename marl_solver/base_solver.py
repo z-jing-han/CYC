@@ -5,6 +5,7 @@ from config import Config
 
 # Unified device setting
 device = torch.device("cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class RunningMeanStd:
     def __init__(self, shape=()):

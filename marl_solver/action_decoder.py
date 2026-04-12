@@ -174,3 +174,117 @@ class XTDecoder(BaseActionDecoder):
             'f_edge': f_edge, 'f_cloud': f_cloud, 'x_cloud': x_cloud,
             'p_cloud': p_cloud, 'x_peer': x_peer, 'p_peer': p_peer
         }
+
+class XTRDecoder(BaseActionDecoder):
+    """
+    Proportional Relaxed Decoder:
+    Uses Logits and Softmax to allocate Data and Time proportionally.
+    Outputs soft 'penalties' for exceeding P_MAX to allow Lagrangian Relaxation in RL.
+    """
+    def get_action_dim(self, num_neighbors):
+        # 0: a_comp (local compute ratio)
+        # 1: a_fcloud (cloud compute ratio)
+        # Data Logits: [cloud, peer_1, ..., peer_N, idle] -> num_neighbors + 2
+        # Time Logits: [cloud, peer_1, ..., peer_N, idle] -> num_neighbors + 2
+        return 2 + (num_neighbors + 2) + (num_neighbors + 2)
+
+    def decode(self, state, raw_actions, num_edge, neighbors_map):
+        Q_edge = state['Q_edge']
+        Q_cloud = state['Q_cloud']
+        f_edge = np.zeros(num_edge)
+        f_cloud = np.zeros(num_edge)
+        x_cloud = np.zeros(num_edge)
+        p_cloud = np.zeros(num_edge)
+        x_peer = np.zeros((num_edge, num_edge))
+        p_peer = np.zeros((num_edge, num_edge))
+        
+        penalties = np.zeros(num_edge) 
+        
+        SAFE_T_OFF = Config.TIME_SLOT_DURATION * 0.99999
+
+        for i in range(num_edge):
+            action = raw_actions[i]
+            neighbors = neighbors_map.get(i, [])
+            num_neighbors = len(neighbors)
+            
+            # --- 1. Local & Cloud Computation Allocation ---
+            a_comp = action[0]
+            a_fcloud = action[1]
+            
+            max_ec_bits = (Config.EDGE_F_MAX * Config.TIME_SLOT_DURATION) / Config.PHI
+            actual_x_comp = a_comp * min(Q_edge[i], max_ec_bits)
+            f_edge[i] = (actual_x_comp * Config.PHI) / Config.TIME_SLOT_DURATION
+            
+            needed_f_cloud = (Q_cloud[i] * Config.PHI) / Config.TIME_SLOT_DURATION
+            f_cloud[i] = a_fcloud * min(Config.CLOUD_F_MAX, needed_f_cloud)
+            
+            # --- 2. Extract Data & Time Logits ---
+            start_data = 2
+            end_data = 2 + num_neighbors + 2
+            data_logits = action[start_data:end_data]
+            
+            start_time = end_data
+            end_time = start_time + num_neighbors + 2
+            time_logits = action[start_time:end_time]
+            
+            # --- 3. Create Validity Mask (Cloud, N Peers, Idle) ---
+            mask = np.ones(num_neighbors + 2, dtype=bool)
+            for idx, neighbor_id in enumerate(neighbors):
+                if Q_edge[i] <= Q_edge[neighbor_id]:
+                    mask[idx + 1] = False
+            
+            data_probs = self._softmax_with_mask(data_logits, mask)
+            time_probs = self._softmax_with_mask(time_logits, mask)
+            
+            # --- 4. Allocate Remaining Data & Time ---
+            Q_rem = Q_edge[i] - actual_x_comp
+            
+            raw_x_cloud = data_probs[0] * Q_rem
+            raw_t_cloud = time_probs[0] * SAFE_T_OFF
+            
+            # --- 5. Calculate Power & Penalty for Cloud ---
+            p_cloud_req = self._calc_p_req(raw_x_cloud, raw_t_cloud, Config.BANDWIDTH, Config.G_IC, Config.NOISE_POWER)
+            if p_cloud_req > Config.EDGE_P_MAX:
+                penalties[i] += (p_cloud_req - Config.EDGE_P_MAX)
+            
+            x_cloud[i], p_cloud[i] = compute_actual_x_and_p(
+                x_target=raw_x_cloud, t_alloc=raw_t_cloud,
+                W=Config.BANDWIDTH, g=Config.G_IC,
+                N0=Config.NOISE_POWER, p_max=Config.EDGE_P_MAX
+            )
+            
+            # --- 6. Calculate Power & Penalty for Peers ---
+            for idx, neighbor_id in enumerate(neighbors):
+                if mask[idx + 1]:
+                    raw_x_p = data_probs[idx + 1] * Q_rem
+                    raw_t_p = time_probs[idx + 1] * SAFE_T_OFF
+                    
+                    p_peer_req = self._calc_p_req(raw_x_p, raw_t_p, Config.BANDWIDTH, Config.G_IJ, Config.NOISE_POWER)
+                    if p_peer_req > Config.EDGE_P_MAX:
+                        penalties[i] += (p_peer_req - Config.EDGE_P_MAX)
+                        
+                    x_actual, p_actual = compute_actual_x_and_p(
+                        x_target=raw_x_p, t_alloc=raw_t_p,
+                        W=Config.BANDWIDTH, g=Config.G_IJ,
+                        N0=Config.NOISE_POWER, p_max=Config.EDGE_P_MAX
+                    )
+                    x_peer[i, neighbor_id] = x_actual
+                    p_peer[i, neighbor_id] = p_actual
+
+        return {
+            'f_edge': f_edge, 'f_cloud': f_cloud, 'x_cloud': x_cloud,
+            'p_cloud': p_cloud, 'x_peer': x_peer, 'p_peer': p_peer,
+            'penalties': penalties
+        }
+
+    def _softmax_with_mask(self, logits, mask):
+        safe_logits = np.where(mask, logits, -1e9)
+        e_x = np.exp(safe_logits - np.max(safe_logits))
+        e_x = np.where(mask, e_x, 0.0)
+        sum_e_x = np.sum(e_x)
+        return e_x / (sum_e_x + 1e-9)
+        
+    def _calc_p_req(self, x, t, W, g, N0):
+        if t <= 1e-9 or x <= 1e-9:
+            return 0.0
+        return (2**(x / (W * t)) - 1) * (N0 / g)
