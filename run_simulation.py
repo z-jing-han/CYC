@@ -24,9 +24,7 @@ from dwpa_opt.AO import AOSolver
 from dwpa_opt.gurobi import GurobiSolver
 
 # MARL Method
-from marl_solver.action_decoder import XPDecoder, XTDecoder, XTRDecoder
-from marl_solver.maddpg_solver import MADDPGSolver, run_marl_training
-from marl_solver.mappo_solver import MAPPOSolver, run_mappo_training
+from marl_related.runner import setup_marl_solver, check_and_train_marl
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Green MEC Simulation Runner")
@@ -57,75 +55,6 @@ def validate_input_files(input_dir):
         found_paths[key] = file_path
     
     return found_paths
-
-
-def setup_marl_solver(algorithm_config_str, env, output_dir):
-    parts = algorithm_config_str.split('_')
-    algo_name = parts[0]
-    decoder_name = parts[1] if len(parts) > 1 else 'XT'
-    use_ctde = True if len(parts) > 2 and parts[2] == 'CTDE' else False
-
-    available_decoders = {
-        'XP': XPDecoder(),
-        'XT': XTDecoder(),
-        'XTR': XTRDecoder()
-    }
-
-    available_marl_solvers = {
-        'MADDPG': MADDPGSolver,
-        'MAPPO': MAPPOSolver
-    }
-
-    if algo_name not in available_marl_solvers:
-        raise ValueError(f"Unknown marl algorithm: {algo_name}")
-    if decoder_name not in available_decoders:
-        raise ValueError(f"Unknown decoder: {decoder_name}")
-
-    decoder_instance = available_decoders[decoder_name]
-    SolverClass = available_marl_solvers[algo_name]
-
-    solver = SolverClass(env=env, decoder=decoder_instance, use_ctde=use_ctde)
-
-    weights_path = os.path.join(output_dir, solver.weight_filename)
-    if os.path.exists(weights_path):
-        solver.load_weights(output_dir)
-        solver.is_training = False 
-    else:
-        raise FileNotFoundError(f"Can't find the weight {weights_path}")
-        
-    return solver
-
-
-def check_and_train_marl(algorithms_to_run, output_dir):
-    for algo_config_str in algorithms_to_run:
-        if algo_config_str.startswith("MA"):
-            parts = algo_config_str.split('_')
-            algo_name = parts[0]
-            decoder_name = parts[1] if len(parts) > 1 else 'XT'
-            use_ctde = True if len(parts) > 2 and parts[2] == 'CTDE' else False
-            
-            train_env = CloudEdgeEnvironment(DataLoader())
-            
-            if decoder_name == 'XP': train_decoder = XPDecoder()
-            elif decoder_name == 'XT': train_decoder = XTDecoder()
-            elif decoder_name == 'XTR': train_decoder = XTRDecoder()
-            else: train_decoder = XTDecoder()
-            
-            if algo_name == 'MADDPG':
-                train_solver = MADDPGSolver(train_env, train_decoder, use_ctde)
-                training_func = run_marl_training
-            elif algo_name == 'MAPPO':
-                train_solver = MAPPOSolver(train_env, train_decoder, use_ctde)
-                training_func = run_mappo_training
-            else:
-                print(f"[Warning] Unknown algorithm name {algo_name}")
-                continue
-            
-            expected_weight_path = os.path.join(output_dir, train_solver.weight_filename)
-            
-            if not os.path.exists(expected_weight_path):
-                print(f"[Training] Start training for {algo_config_str}...")
-                training_func(train_env, train_solver, output_dir)
             
 def run_simulation(algorithm_config_str, output_dir='Base_Output'):
     logger = SimulationLogger(algorithm_config_str, output_dir)

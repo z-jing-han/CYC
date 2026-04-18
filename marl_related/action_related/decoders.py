@@ -1,31 +1,7 @@
-from config import Config
 import numpy as np
-
-def compute_actual_x_and_p(x_target, t_alloc, W, g, N0, p_max):
-    """
-    Following Lemma 1 and Constraints C4, C5
-    (Extract from MADDPG.py)
-    """
-    if t_alloc <= 1e-9 or x_target <= 1e-9:
-        return 0.0, 0.0
-    
-    R_max = W * np.log2(1 + (g * p_max) / N0)
-    x_max_possible = R_max * t_alloc
-    x_actual = min(x_target, x_max_possible)
-    p_actual = (2**(x_actual / (W * t_alloc)) - 1) * (N0 / g)
-    
-    return x_actual, min(p_actual, p_max)
-
-
-class BaseActionDecoder:
-    def get_action_dim(self, num_neighbors):
-        """Define the output dimension for the neural network"""
-        raise NotImplementedError
-        
-    def decode(self, state, raw_actions, num_edge, neighbors_map):
-        """Rescale raw actions from [0, 1] to the environment's physical action range"""
-        raise NotImplementedError
-
+from config import Config
+from .base_decoder import BaseActionDecoder
+from ..utils import compute_actual_x_and_p
 
 class XPDecoder(BaseActionDecoder):
     """

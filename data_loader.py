@@ -70,7 +70,6 @@ class DataLoader:
                 Config.MARL_NOISE = marl_cfg.get('exploration_noise', 0.05)
                 Config.MARL_V = marl_cfg.get('MARL_V', 1e11)
                 Config.OBSERVATION_PREV = True if marl_cfg['Observation'] == 'prev' else False
-                print(Config.OBSERVATION_PREV)
 
             for i in range(Config.NUM_EDGE_SERVERS):
                 Config.EEDGE_Q_CAPACITY.append(config_data['servers']['edge_servers'][i]['max_capacity_bits'])
