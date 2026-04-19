@@ -8,6 +8,7 @@ class Config:
     CONFIG_JSON = 'config.json' 
     TASK_FILE = 'data_arrival.csv'
     CARBON_FILE = 'carbon_intensity.csv'
+    CARBON_TRAIN_FILE = 'carbon_intensity_train.csv'
     
     # --- Default System Parameters ---
     NUM_EDGE_SERVERS = 5

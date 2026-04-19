@@ -1,34 +1,6 @@
 import numpy as np
 from config import Config
 
-# def calculate_rewards(state, next_state, info, carbon, decisions, V_param=Config.MARL_V, penalty_weight=1e6):
-#     rewards = {}
-#     num_edge = len(state['Q_edge'])
-#     edge_metrics = info.get('edge_metrics', [])
-#     cloud_metrics = info.get('cloud_metrics', [])
-#     penalties = decisions.get('penalties', np.zeros(num_edge))
-
-#     for i in range(num_edge):
-#         drift_edge = 0.5 * (((next_state['Q_edge'][i] / (8 * 1024 * 1024)) ** 2) - ((state['Q_edge'][i] / (8 * 1024 * 1024)) ** 2))
-#         drift_cloud = 0.5 * (((next_state['Q_cloud'][i] / (8 * 1024 * 1024)) ** 2) - ((state['Q_cloud'][i] / (8 * 1024 * 1024)) ** 2))
-#         drift_penalty = drift_edge + drift_cloud
-#         absolute_penalty = 0.01 * ((next_state['Q_edge'][i] / (8 * 1024 * 1024)) + (next_state['Q_cloud'][i] / (8 * 1024 * 1024)))
-#         # q_penalty = next_state['Q_edge'][i] - state['Q_edge'][i] + next_state['Q_cloud'][i] - state['Q_cloud'][i]
-#         # q_penalty = next_state['Q_edge'][i] + next_state['Q_cloud'][i]
-#         carbon_penalty = 0.0
-#         if i < len(edge_metrics):
-#             carbon_penalty += edge_metrics[i]['carbon']
-#         if i < len(cloud_metrics):
-#             carbon_penalty += cloud_metrics[i]['carbon']
-#         power_violation_penalty = penalty_weight * penalties[i]
-        
-#         rewards[i] = - (drift_penalty + absolute_penalty + V_param * carbon_penalty + power_violation_penalty)
-#         print("C:", carbon_penalty)
-#         print("Q:", drift_penalty)
-#         print("A:", absolute_penalty)
-#     print(rewards)
-#     return rewards
-
 def calculate_rewards(state, next_state, info, carbon, decisions, V_param=Config.MARL_V, penalty_weight=1e6):
     rewards = {}
     num_edge = len(state['Q_edge'])
@@ -36,32 +8,49 @@ def calculate_rewards(state, next_state, info, carbon, decisions, V_param=Config
     cloud_metrics = info.get('cloud_metrics', [])
     penalties = decisions.get('penalties', np.zeros(num_edge))
 
+    IS_TOLERANCE, IS_TOTAL_PENALTY, IS_DRIFT, IS_TOTAL_ONLY  = False, False, True, False
+    if IS_TOTAL_ONLY and not IS_TOTAL_PENALTY:
+        raise ValueError("IS_TOTAL_PENALTY must be True if IS_TOTAL_ONLY is True")
+
     BITS_TO_MB = 8 * 1024 * 1024
-    TOLERANCE_MB = 15000.0 
+    TOLERANCE_MB = 15000.0 if IS_TOLERANCE else 0.0
+    global_reward_scale = 1e-6
 
     for i in range(num_edge):
+        # Queue Penalty
         q_edge_t_minus_1 = max(0.0, (state['Q_edge'][i] / BITS_TO_MB) - TOLERANCE_MB)
         q_cloud_t_minus_1 = max(0.0, (state['Q_cloud'][i] / BITS_TO_MB) - TOLERANCE_MB)
-        
         q_edge_t = max(0.0, (next_state['Q_edge'][i] / BITS_TO_MB) - TOLERANCE_MB)
         q_cloud_t = max(0.0, (next_state['Q_cloud'][i] / BITS_TO_MB) - TOLERANCE_MB)
         
-        drift_edge = 0.5 * ((q_edge_t ** 2) - (q_edge_t_minus_1 ** 2))
-        drift_cloud = 0.5 * ((q_cloud_t ** 2) - (q_cloud_t_minus_1 ** 2))
-        drift_penalty = drift_edge + drift_cloud
+        # Different Penalty
+        edge_penalty = (0.5 if IS_DRIFT else 1.0) * ((q_edge_t ** (2 if IS_DRIFT else 1.0)) - (q_edge_t_minus_1 ** (2 if IS_DRIFT else 1.0)))
+        cloud_penalty = (0.5 if IS_DRIFT else 1.0) * ((q_cloud_t ** (2 if IS_DRIFT else 1.0)) - (q_cloud_t_minus_1 ** (2 if IS_DRIFT else 1.0)))
         
-        # absolute_penalty = 0.0001 * ((next_state['Q_edge'][i] / BITS_TO_MB) + (next_state['Q_cloud'][i] / BITS_TO_MB))
-        
+        # print("edge_penalty", edge_penalty)
+        # print("cloud_penalty", cloud_penalty)
+
+        # Total Queue len penalty
+        absolute_penalty = 0.0001 * ((next_state['Q_edge'][i] / BITS_TO_MB) + (next_state['Q_cloud'][i] / BITS_TO_MB)) if IS_TOTAL_PENALTY else 0.0
+
+        queue_penalty = (0.0 if IS_TOTAL_ONLY else edge_penalty + cloud_penalty) + absolute_penalty
+
+        # print("queue_penalty", queue_penalty)
+
+        # Carbon Penalty
         carbon_penalty = 0.0
         if i < len(edge_metrics):
             carbon_penalty += edge_metrics[i]['carbon']
         if i < len(cloud_metrics):
             carbon_penalty += cloud_metrics[i]['carbon']
-            
+        
+        # print("carbon_penalty", carbon_penalty)
+
         power_violation_penalty = penalty_weight * penalties[i]
         
-        rewards[i] = - (drift_penalty + V_param * carbon_penalty + power_violation_penalty)
-        
+        rewards[i] = - (queue_penalty + V_param * carbon_penalty + power_violation_penalty) * global_reward_scale
+
+    # print("rewards", rewards) 
     return rewards
 
 def compute_actual_x_and_p(x_target, t_alloc, W, g, N0, p_max):

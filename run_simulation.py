@@ -43,7 +43,8 @@ def validate_input_files(input_dir):
     required_files = {
         'config': 'config.json',
         'carbon': 'carbon_intensity.csv',
-        'task': 'data_arrival.csv'
+        'task': 'data_arrival.csv',
+        'carbon_train': 'carbon_intensity_train.csv'
     }
 
     found_paths = {}
@@ -125,6 +126,7 @@ if __name__ == "__main__":
         Config.CONFIG_JSON = files['config']
         Config.CARBON_FILE = files['carbon']
         Config.TASK_FILE = files['task']
+        Config.CARBON_TRAIN_FILE = files['carbon_train']
         
         # 4. Setup Output Directory
         if not os.path.exists(args.output_dir):

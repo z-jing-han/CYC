@@ -1,8 +1,9 @@
 import numpy as np
+import random
 from config import Config
 
 class CloudEdgeEnvironment:
-    def __init__(self, data_loader, warning_log_file=None, logger=None):
+    def __init__(self, data_loader, warning_log_file=None, logger=None, is_training=False):
         self.task_data, self.ci_hist_raw, self.ci_pred_raw, self.edge_graph = data_loader.load_data()
         self.logger = logger
 
@@ -13,12 +14,21 @@ class CloudEdgeEnvironment:
         
         self.num_edge = Config.NUM_EDGE_SERVERS
         self.time_step = 0
+        self.is_training = is_training
+        self.start_offset = 0
+        
+        if self.ci_hist_raw:
+            first_key = list(self.ci_hist_raw.keys())[0]
+            self.total_data_length = len(self.ci_hist_raw[first_key]) 
+        else:
+            self.total_data_length = 1000
+        self.episode_length = 1000 
         
         if self.task_data:
             first_key = list(self.task_data.keys())[0]
-            self.max_time_steps = len(self.task_data[first_key])
+            self.task_length = len(self.task_data[first_key])
         else:
-            self.max_time_steps = 1000
+            self.task_length = 1000
         
         self.queues_edge = np.zeros(self.num_edge)
         self.queues_cloud = np.zeros(self.num_edge)
@@ -48,6 +58,11 @@ class CloudEdgeEnvironment:
 
     def reset(self):
         self.time_step = 0
+        if self.is_training:
+            max_start = max(0, self.total_data_length - self.episode_length)
+            self.start_offset = random.randint(0, max_start) 
+        else:
+            self.start_offset = 0
         # Reset Queues: 0 MB Initial
         self.queues_edge.fill(0.0) 
         self.queues_cloud.fill(0)
@@ -71,11 +86,12 @@ class CloudEdgeEnvironment:
         f_cloud = decisions.get('f_cloud', np.zeros(self.num_edge)).copy()
 
         if self.logger:
-            self.logger.log_algorithm_decisions(self.time_step % self.max_time_steps, decisions)
+            self.logger.log_algorithm_decisions(self.time_step, decisions)
 
         # Get Environment State
         state = self._get_state()
-        t_actual = self.time_step % self.max_time_steps
+        # t_actual = self.time_step % self.max_time_steps
+        t_actual = (self.time_step + self.start_offset) % self.total_data_length
 
         # Use real data, not alpha smooth one
         ci_edge = np.zeros(self.num_edge)
@@ -253,12 +269,13 @@ class CloudEdgeEnvironment:
             }
             self.logger.log_step(metrics)
         
-        done = self.time_step >= self.max_time_steps
+        done = self.time_step >= self.episode_length
         
         return self._get_state(), total_carbon, done, info
 
     def _get_state(self):
-        t = self.time_step % self.max_time_steps
+        t_actual = (self.time_step + self.start_offset) % self.total_data_length
+        t_task = (self.time_step + self.start_offset) % self.task_length
         
         ci_edge = np.zeros(self.num_edge)
         ci_cloud = np.zeros(self.num_edge)
@@ -267,20 +284,19 @@ class CloudEdgeEnvironment:
         for i in range(self.num_edge):
             edge_name = f"Edge Server {i+1}"
             
-            # Change to Predict State
             if edge_name in self.ci_pred_raw:
-                ci_edge[i] = self.ci_pred_raw[edge_name][t]
+                ci_edge[i] = self.ci_pred_raw[edge_name][t_actual]
             else:
                 raise ValueError(f"Missing edge_name {edge_name}")
                 
             cloud_name = f"Cloud Server {i+1}"
             if cloud_name in self.ci_pred_raw: 
-                ci_cloud[i] = self.ci_pred_raw[cloud_name][t]
+                ci_cloud[i] = self.ci_pred_raw[cloud_name][t_actual]
             else:
                 raise ValueError(f"Missing cloud_name {cloud_name}")
                 
             if edge_name in self.task_data:
-                arrival_sizes[i] = self.task_data[edge_name][t]
+                arrival_sizes[i] = self.task_data[edge_name][t_task]
         
         return {
             'Q_edge': self.queues_edge.copy(),

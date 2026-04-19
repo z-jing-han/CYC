@@ -17,7 +17,6 @@ from .algorithm_related.maddpg import MADDPGSolver
 from .algorithm_related.mappo import MAPPOSolver
 from .algorithm_related.ao_solver import MAAODDPGSolver, MAAOPPOSolver
 
-# 引入 Utils
 from .utils import calculate_rewards, compute_gae
 
 def setup_marl_solver(algorithm_config_str, env, output_dir):
@@ -60,7 +59,6 @@ def setup_marl_solver(algorithm_config_str, env, output_dir):
         
     return solver
 
-
 def check_and_train_marl(algorithms_to_run, output_dir):
     for algo_config_str in algorithms_to_run:
         if algo_config_str.startswith("MA"):
@@ -69,7 +67,8 @@ def check_and_train_marl(algorithms_to_run, output_dir):
             decoder_name = parts[1] if len(parts) > 1 else 'XT'
             use_ctde = True if len(parts) > 2 and parts[2] == 'CTDE' else False
             
-            train_env = CloudEdgeEnvironment(DataLoader())
+            train_loader = DataLoader(carbon_path=Config.CARBON_TRAIN_FILE)
+            train_env = CloudEdgeEnvironment(train_loader, is_training=True)
             
             if decoder_name == 'XP': train_decoder = XPDecoder()
             elif decoder_name == 'XT': train_decoder = XTDecoder()
@@ -80,13 +79,13 @@ def check_and_train_marl(algorithms_to_run, output_dir):
             
             if algo_name == 'MADDPG':
                 train_solver = MADDPGSolver(train_env, train_decoder, use_ctde)
-                training_func = run_marl_training
+                training_func = run_ddpg_training
             elif algo_name == 'MAPPO':
                 train_solver = MAPPOSolver(train_env, train_decoder, use_ctde)
                 training_func = run_mappo_training
             elif algo_name == 'MAAODDPG':
                 train_solver = MAAODDPGSolver(train_env, train_decoder, use_ctde) 
-                training_func = run_marl_training                           
+                training_func = run_ddpg_training                           
             elif algo_name == 'MAAOPPO':
                 train_solver = MAAOPPOSolver(train_env, train_decoder, use_ctde)  
                 training_func = run_mappo_training
@@ -100,7 +99,7 @@ def check_and_train_marl(algorithms_to_run, output_dir):
                 print(f"[Training] Start training for {algo_config_str}...")
                 training_func(train_env, train_solver, output_dir)
 
-def run_marl_training(env, solver, output_dir):
+def run_ddpg_training(env, solver, output_dir):
     csv_dir = os.path.join(output_dir, "csv")
     os.makedirs(csv_dir, exist_ok=True)
     csv_filename = f"{solver.algo_name}_{solver.decoder.__class__.__name__}_{'CTDE' if solver.use_ctde else 'Decentralized'}_Reward.csv"
@@ -148,7 +147,7 @@ def run_marl_training(env, solver, output_dir):
                 for i in range(env.num_edge):
                     b_obs_dict[i] = torch.tensor(np.array([x[0][i] for x in batch]), dtype=torch.float32).to(device)
                     b_act_dict[i] = torch.tensor(np.array([x[1][i] for x in batch]), dtype=torch.float32).to(device)
-                    b_rew_dict[i] = torch.tensor(np.array([x[2][i] for x in batch]), dtype=torch.float32).unsqueeze(1).to(device) / 1e3
+                    b_rew_dict[i] = torch.tensor(np.array([x[2][i] for x in batch]), dtype=torch.float32).unsqueeze(1).to(device)
                     b_nobs_dict[i] = torch.tensor(np.array([x[3][i] for x in batch]), dtype=torch.float32).to(device)
                 
                 for i in range(env.num_edge):
@@ -170,8 +169,6 @@ def run_marl_training(env, solver, output_dir):
         writer.writerow(["Episode", "Total_Reward", "Total_Carbon", "Avg_Queue"])
         writer.writerows(training_history)
     print(f"MARL training history saved to: {csv_path}")
-
-
 
 def run_mappo_training(env, solver, output_dir):
     csv_dir = os.path.join(output_dir, "csv")
@@ -215,7 +212,7 @@ def run_mappo_training(env, solver, output_dir):
                 rollouts[i]['global_obs'].append(global_obs)
                 rollouts[i]['acts'].append(decisions['unclipped_actions'][i])
                 rollouts[i]['log_probs'].append(decisions['log_probs'][i])
-                rollouts[i]['rewards'].append(rewards[i] / 1e10)
+                rollouts[i]['rewards'].append(rewards[i])
                 rollouts[i]['values'].append(decisions['values'][i])
                 rollouts[i]['dones'].append(float(done))
                 
