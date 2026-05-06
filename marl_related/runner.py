@@ -16,14 +16,21 @@ from .algorithm_related.base_solver import device
 from .algorithm_related.maddpg import MADDPGSolver
 from .algorithm_related.mappo import MAPPOSolver
 from .algorithm_related.ao_solver import MAAODDPGSolver, MAAOPPOSolver
+from .algorithm_related.split_solver import MAFreqPPOSolver
 
-from .utils import calculate_rewards, compute_gae
+from .utils import calculate_rewards, compute_gae, compute_post_comp_state
 
 def setup_marl_solver(algorithm_config_str, env, output_dir):
     parts = algorithm_config_str.split('_')
     algo_name = parts[0]
     decoder_name = parts[1] if len(parts) > 1 else 'XT'
     use_ctde = True if len(parts) > 2 and parts[2] == 'CTDE' else False
+
+    if algo_name in ['MAAODDPG', 'MAAOPPO', 'MATWOPPO']:
+        if decoder_name == 'XP':
+            decoder_name = 'AOXP'
+        elif decoder_name == 'XT':
+            decoder_name = 'AOXT'
 
     available_decoders = {
         'XP': XPDecoder(),
@@ -32,7 +39,7 @@ def setup_marl_solver(algorithm_config_str, env, output_dir):
         'AOXP': AO_XPDecoder(),
         'AOXT': AO_XTDecoder()
     }
-
+    
     available_marl_solvers = {
         'MADDPG': MADDPGSolver,
         'MAPPO': MAPPOSolver,
@@ -40,24 +47,89 @@ def setup_marl_solver(algorithm_config_str, env, output_dir):
         'MAAOPPO': MAAOPPOSolver
     }
 
-    if algo_name not in available_marl_solvers:
+    if algo_name not in available_marl_solvers and algo_name != 'MATWOPPO':
         raise ValueError(f"Unknown marl algorithm: {algo_name}")
     if decoder_name not in available_decoders:
         raise ValueError(f"Unknown decoder: {decoder_name}")
 
     decoder_instance = available_decoders[decoder_name]
-    SolverClass = available_marl_solvers[algo_name]
 
-    solver = SolverClass(env=env, decoder=decoder_instance, use_ctde=use_ctde)
+    # Handle MATWOPPO special loading logic (Dual-Agent architecture)
+    if algo_name == 'MATWOPPO':
+        from .algorithm_related.split_solver import MAFreqPPOSolver
 
-    weights_path = os.path.join(output_dir, solver.weight_filename)
-    if os.path.exists(weights_path):
-        solver.load_weights(output_dir)
-        solver.is_training = False 
-    else:
-        raise FileNotFoundError(f"Can't find the weight {weights_path}")
+        # Load Freq Solver
+        freq_solver = MAFreqPPOSolver(env, use_ctde)
+        freq_solver.algo_name = "MATWOPPO_Freq"
+        freq_solver.weight_filename = f"{freq_solver.algo_name}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
         
-    return solver
+        freq_path = os.path.join(output_dir, freq_solver.weight_filename)
+        if os.path.exists(freq_path):
+            freq_solver.load_weights(output_dir)
+            freq_solver.is_training = False
+        else:
+            raise FileNotFoundError(f"Can't find Freq weight: {freq_path}")
+
+        # Load Offload Solver
+        offload_solver = MAPPOSolver(env, decoder_instance, use_ctde)
+        offload_solver.algo_name = "MATWOPPO_Offload"
+        offload_solver.weight_filename = f"{offload_solver.algo_name}_{decoder_instance.__class__.__name__}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
+        
+        offload_path = os.path.join(output_dir, offload_solver.weight_filename)
+        if os.path.exists(offload_path):
+            offload_solver.load_weights(output_dir)
+            offload_solver.is_training = False
+        else:
+            # Compatibility: Fallback to MAAOPPO weights if no checkpoints were updated during offload training
+            ao_weight_name = f"MAAOPPO_{decoder_instance.__class__.__name__}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
+            ao_weight_path = os.path.join(output_dir, ao_weight_name)
+            if os.path.exists(ao_weight_path):
+                original_name = offload_solver.weight_filename
+                offload_solver.weight_filename = ao_weight_name
+                offload_solver.load_weights(output_dir)
+                offload_solver.weight_filename = original_name
+                offload_solver.is_training = False
+            else:
+                raise FileNotFoundError(f"Can't find Offload weight {offload_path} or {ao_weight_path}")
+
+        # Create a lightweight wrapper to provide a unified 'solve' interface
+        class MATWOPPOWrapper:
+            def __init__(self, f_solver, o_solver):
+                self.freq_solver = f_solver
+                self.offload_solver = o_solver
+                self.algo_name = "MATWOPPO"
+                
+            def reset_internal_state(self, initial_Q_edge):
+                if hasattr(self.freq_solver, 'reset_internal_state'):
+                    self.freq_solver.reset_internal_state(initial_Q_edge)
+                if hasattr(self.offload_solver, 'reset_internal_state'):
+                    self.offload_solver.reset_internal_state(initial_Q_edge)
+
+            def solve(self, state, **kwargs):
+                # Exe two agent action
+                f_dec = self.freq_solver.solve(state, store_rollout=False)
+                post_state = compute_post_comp_state(state, f_dec['f_edge'], f_dec['f_cloud'])
+                o_dec = self.offload_solver.solve(post_state, store_rollout=False)
+                
+                # Combine decision result
+                combined_dec = {**o_dec, 'f_edge': f_dec['f_edge'], 'f_cloud': f_dec['f_cloud']}
+                return combined_dec
+
+        return MATWOPPOWrapper(freq_solver, offload_solver)
+    
+    # Handle algorithm loading logic for standard single-Agent
+    else:
+        SolverClass = available_marl_solvers[algo_name]
+        solver = SolverClass(env=env, decoder=decoder_instance, use_ctde=use_ctde)
+
+        weights_path = os.path.join(output_dir, solver.weight_filename)
+        if os.path.exists(weights_path):
+            solver.load_weights(output_dir)
+            solver.is_training = False 
+        else:
+            raise FileNotFoundError(f"Can't find the weight {weights_path}")
+            
+        return solver
 
 def check_and_train_marl(algorithms_to_run, output_dir):
     for algo_config_str in algorithms_to_run:
@@ -67,6 +139,12 @@ def check_and_train_marl(algorithms_to_run, output_dir):
             decoder_name = parts[1] if len(parts) > 1 else 'XT'
             use_ctde = True if len(parts) > 2 and parts[2] == 'CTDE' else False
             
+            if algo_name in ['MAAODDPG', 'MAAOPPO', 'MATWOPPO']:
+                if decoder_name == 'XP':
+                    decoder_name = 'AOXP'
+                elif decoder_name == 'XT':
+                    decoder_name = 'AOXT'
+
             train_loader = DataLoader(carbon_path=Config.CARBON_TRAIN_FILE)
             train_env = CloudEdgeEnvironment(train_loader, is_training=True)
             
@@ -89,6 +167,43 @@ def check_and_train_marl(algorithms_to_run, output_dir):
             elif algo_name == 'MAAOPPO':
                 train_solver = MAAOPPOSolver(train_env, train_decoder, use_ctde)  
                 training_func = run_mappo_training
+            elif algo_name == 'MATWOPPO':
+                # Split Two Agent Training Logic
+
+                # Freq Solver (alaways training)
+                freq_solver = MAFreqPPOSolver(train_env, use_ctde)
+                freq_solver.algo_name = "MATWOPPO_Freq"
+                freq_solver.weight_filename = f"{freq_solver.algo_name}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
+                
+                # Offloading Solver
+                offload_solver = MAPPOSolver(train_env, train_decoder, use_ctde)
+                offload_solver.algo_name = "MATWOPPO_Offload"
+                offload_solver.weight_filename = f"{offload_solver.algo_name}_{train_decoder.__class__.__name__}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
+
+                # Load offloading weight
+                if not getattr(Config, 'MATWOPPO_TRAIN_FROM_SCRATCH', True):
+                    # Find AOPPO offloading wieght
+                    ao_weight_name = f"MAAOPPO_{train_decoder.__class__.__name__}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
+                    ao_weight_path = os.path.join(output_dir, ao_weight_name)
+                    
+                    if os.path.exists(ao_weight_path):
+                        original_name = offload_solver.weight_filename
+                        offload_solver.weight_filename = ao_weight_name
+                        offload_solver.load_weights(output_dir)
+                        offload_solver.weight_filename = original_name
+                        offload_solver.is_training = False
+                        print(f"[{algo_name}] Load AOPPO Weight")
+                    else:
+                        print(f"[{algo_name}] Train AOPPO Weight")
+                        offload_solver.is_training = True
+                else:
+                    offload_solver.is_training = True
+                    print(f"[{algo_name}] Mode: Train both Freq and Offloading")
+
+                # Run the decouple training process
+                run_decoupled_split_ppo_training(train_env, freq_solver, offload_solver, output_dir)
+
+                continue
             else:
                 print(f"[Warning] Unknown algorithm name {algo_name}")
                 continue
@@ -198,7 +313,7 @@ def run_mappo_training(env, solver, output_dir):
             # Instruct the Solver to store log_probs and values
             decisions = solver.solve(state, store_rollout=True)
             next_state, carbon, done, info = env.step(decisions)
-            
+
             epoch_queue.append(np.mean(next_state['Q_edge'])) 
             epoch_carbon += carbon
             
@@ -252,3 +367,131 @@ def run_mappo_training(env, solver, output_dir):
         writer.writerow(["Episode", "Total_Reward", "Total_Carbon", "Avg_Queue"])
         writer.writerows(training_history)
     print(f"MARL training history saved to: {csv_path}")
+
+def run_decoupled_split_ppo_training(env, freq_solver, offload_solver, output_dir):
+    csv_dir = os.path.join(output_dir, "csv")
+    os.makedirs(csv_dir, exist_ok=True)
+    
+    ctde_str = 'CTDE' if freq_solver.use_ctde else 'Decentralized'
+    decoder_name = offload_solver.decoder.__class__.__name__
+    csv_path = os.path.join(csv_dir, f"MATWOPPO_{decoder_name}_{ctde_str}_Reward.csv")
+    
+    training_history = []
+    episodes = getattr(Config, 'MARL_EPISODES', 500)
+    best_reward = -float('inf')
+
+    for ep in range(episodes):
+        state = env.reset()
+        
+        if Config.OBSERVATION_PREV:
+            if freq_solver.is_training: freq_solver.reset_internal_state(state['Q_edge'])
+            if offload_solver.is_training: offload_solver.reset_internal_state(state['Q_edge'])
+
+        done = False
+        epoch_carbon = 0.0
+        epoch_queue = []
+        epoch_reward = 0.0
+        
+        # Two independent Rollout Buffer for different agent
+        freq_rollouts = {i: {'obs': [], 'global_obs': [], 'acts': [], 'log_probs': [], 'rewards': [], 'values': [], 'dones': []} for i in range(env.num_edge)}
+        offload_rollouts = {i: {'obs': [], 'global_obs': [], 'acts': [], 'log_probs': [], 'rewards': [], 'values': [], 'dones': []} for i in range(env.num_edge)}
+        
+        while not done:
+            f_dec = freq_solver.solve(state, store_rollout=freq_solver.is_training)
+            post_state = compute_post_comp_state(state, f_dec['f_edge'], f_dec['f_cloud'])
+            
+            o_dec = offload_solver.solve(post_state, store_rollout=offload_solver.is_training)
+            
+            combined_dec = {**o_dec, 'f_edge': f_dec['f_edge'], 'f_cloud': f_dec['f_cloud']}
+            next_state, carbon, done, info = env.step(combined_dec)
+            rewards = calculate_rewards(state, next_state, info, carbon, combined_dec, V_param=Config.MARL_V)
+
+            epoch_queue.append(np.mean(next_state['Q_edge']))
+            epoch_carbon += carbon
+            epoch_reward += sum(rewards.values())
+            
+            # Store Freq Agent Training Data
+            if freq_solver.is_training:
+                global_obs_f = np.concatenate([freq_solver._extract_obs(state, j).squeeze(0).cpu().numpy() for j in range(env.num_edge)])
+                for i in range(env.num_edge):
+                    freq_rollouts[i]['obs'].append(freq_solver._extract_obs(state, i).squeeze(0).cpu().numpy())
+                    freq_rollouts[i]['global_obs'].append(global_obs_f)
+                    freq_rollouts[i]['acts'].append(f_dec['unclipped_actions'][i])
+                    freq_rollouts[i]['log_probs'].append(f_dec['log_probs'][i])
+                    freq_rollouts[i]['rewards'].append(rewards[i])
+                    freq_rollouts[i]['values'].append(f_dec['values'][i])
+                    freq_rollouts[i]['dones'].append(float(done))
+
+            # Store Offload Agent Training Data
+            if offload_solver.is_training:
+                global_obs_o = np.concatenate([offload_solver._extract_obs(post_state, j).squeeze(0).cpu().numpy() for j in range(env.num_edge)])
+                for i in range(env.num_edge):
+                    offload_rollouts[i]['obs'].append(offload_solver._extract_obs(post_state, i).squeeze(0).cpu().numpy())
+                    offload_rollouts[i]['global_obs'].append(global_obs_o)
+                    offload_rollouts[i]['acts'].append(o_dec['unclipped_actions'][i])
+                    offload_rollouts[i]['log_probs'].append(o_dec['log_probs'][i])
+                    offload_rollouts[i]['rewards'].append(rewards[i])
+                    offload_rollouts[i]['values'].append(o_dec['values'][i])
+                    offload_rollouts[i]['dones'].append(float(done))
+                    
+            state = next_state
+        
+        # Compute GAE
+        with torch.no_grad():
+            if freq_solver.is_training:
+                global_next_obs_f = np.concatenate([freq_solver._extract_obs(state, j).squeeze(0).cpu().numpy() for j in range(env.num_edge)])
+                global_next_obs_tensor_f = torch.tensor(global_next_obs_f, dtype=torch.float32).unsqueeze(0).to(device)
+                
+                for i in range(env.num_edge):
+                    next_obs_tensor = freq_solver._extract_obs(state, i)
+                    if freq_solver.use_ctde:
+                        next_value = freq_solver.agents[i]['critic'](global_next_obs_tensor_f).item()
+                    else:
+                        next_value = freq_solver.agents[i]['critic'](next_obs_tensor).item()
+                        
+                    advs = compute_gae(freq_rollouts[i]['rewards'], freq_rollouts[i]['values'], next_value, freq_rollouts[i]['dones'])
+                    freq_rollouts[i]['advs'] = advs
+                    freq_rollouts[i]['returns'] = [adv + val for adv, val in zip(advs, freq_rollouts[i]['values'])]
+            
+            if offload_solver.is_training:
+                next_f_dec = freq_solver.solve(state, store_rollout=False)
+                next_post_state = compute_post_comp_state(state, next_f_dec['f_edge'], next_f_dec['f_cloud'])
+                
+                global_next_obs_o = np.concatenate([offload_solver._extract_obs(next_post_state, j).squeeze(0).cpu().numpy() for j in range(env.num_edge)])
+                global_next_obs_tensor_o = torch.tensor(global_next_obs_o, dtype=torch.float32).unsqueeze(0).to(device)
+                
+                for i in range(env.num_edge):
+                    next_obs_tensor = offload_solver._extract_obs(next_post_state, i)
+                    if offload_solver.use_ctde:
+                        next_value = offload_solver.agents[i]['critic'](global_next_obs_tensor_o).item()
+                    else:
+                        next_value = offload_solver.agents[i]['critic'](next_obs_tensor).item()
+                        
+                    advs = compute_gae(offload_rollouts[i]['rewards'], offload_rollouts[i]['values'], next_value, offload_rollouts[i]['dones'])
+                    offload_rollouts[i]['advs'] = advs
+                    offload_rollouts[i]['returns'] = [adv + val for adv, val in zip(advs, offload_rollouts[i]['values'])]
+
+        # Update
+        if freq_solver.is_training:
+            freq_solver.train(freq_rollouts)
+            
+        if offload_solver.is_training:
+            offload_solver.train(offload_rollouts)
+        
+        avg_q = np.mean(epoch_queue)
+        training_history.append([ep + 1, epoch_reward, epoch_carbon, avg_q])
+        
+        mode_str = "Train Both" if offload_solver.is_training else "Train Freq Only (Offload Frozen)"
+        print(f"[MATWOPPO | {mode_str}] Ep {ep+1:3d} | R: {epoch_reward:12.4f} | C: {epoch_carbon:10.4f} g | Avg Q: {avg_q:12.4f} bits")
+
+        if epoch_reward > best_reward:
+            best_reward = epoch_reward
+            print(f"*** New best reward {best_reward:.4f}! Saving weights... ***")
+            if freq_solver.is_training: freq_solver.save_weights(output_dir)
+            if offload_solver.is_training: offload_solver.save_weights(output_dir)
+    
+    with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(["Episode", "Total_Reward", "Total_Carbon", "Avg_Queue"])
+        writer.writerows(training_history)
+    print(f"MATWOPPO training history saved to: {csv_path}")

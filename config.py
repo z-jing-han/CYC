@@ -50,3 +50,4 @@ class Config:
     MARL_NOISE = 0.05
     MARL_V = 1e11
     OBSERVATION_PREV = False
+    MATWOPPO_TRAIN_FROM_SCRATCH = True

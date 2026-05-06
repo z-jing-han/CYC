@@ -124,6 +124,10 @@ def compute_ao_state(state):
             f_edge[i] = np.clip(np.sqrt(Q_edge[i] / denom), 0, Config.EDGE_F_MAX)
         else:
             f_edge[i] = Config.EDGE_F_MAX
+
+        # Const f_edge test
+        # f_edge[i] = Config.EDGE_F_MAX * 2 / 9
+
         bits_local = (f_edge[i] / Config.PHI) * Config.TIME_SLOT_DURATION
         Q_edge[i] = max(0, Q_edge[i] - bits_local)
         
@@ -133,6 +137,10 @@ def compute_ao_state(state):
             f_cloud[i] = np.clip(np.sqrt(Q_cloud[i] / denom_c), 0, Config.CLOUD_F_MAX)
         else:
             f_cloud[i] = Config.CLOUD_F_MAX
+
+        # Const f_cloud test
+        # f_cloud[i] = Config.CLOUD_F_MAX * 2 / 9
+
         bits_cloud = (f_cloud[i] / Config.PHI) * Config.TIME_SLOT_DURATION
         Q_cloud[i] = max(0, Q_cloud[i] - bits_cloud)
         
@@ -141,3 +149,19 @@ def compute_ao_state(state):
     post_comp_state['Q_cloud'] = Q_cloud
     
     return f_edge, f_cloud, post_comp_state
+
+def compute_post_comp_state(state, f_edge, f_cloud):
+    post_state = state.copy()
+    Q_edge = state['Q_edge'].copy()
+    Q_cloud = state['Q_cloud'].copy()
+    
+    for i in range(len(Q_edge)):
+        bits_local = (f_edge[i] / Config.PHI) * Config.TIME_SLOT_DURATION
+        Q_edge[i] = max(0, Q_edge[i] - bits_local)
+        
+        bits_cloud = (f_cloud[i] / Config.PHI) * Config.TIME_SLOT_DURATION
+        Q_cloud[i] = max(0, Q_cloud[i] - bits_cloud)
+        
+    post_state['Q_edge'] = Q_edge
+    post_state['Q_cloud'] = Q_cloud
+    return post_state

@@ -3,9 +3,9 @@ ChenPC*
 pcchen_mid.pdf
 
 Data/*
-!Data/Base_Input/
-Data/Base_Input/*
-!Data/Base_Input/config.json
+!Data/Thesis_Input/
+Data/Thesis_Input/*
+!Data/Thesis_Input/config.json
 
 dwpa_solver
 dwpa_competitor
