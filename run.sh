@@ -1,7 +1,7 @@
 #!/bin/bash
 
-INPUT_DIR="${1:-Data/Base_Input/}"
-OUTPUT_DIR="${2:-Data/Base_Output/}"
+INPUT_DIR="${1:-Data/Thesis_Input/}"
+OUTPUT_DIR="${2:-Data/Thesis_Output/}"
 if [ ! -f "${INPUT_DIR}/data_arrival.csv" ]; then
     python3 generate.py --dir "${INPUT_DIR}"
 fi

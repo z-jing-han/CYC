@@ -180,6 +180,14 @@ def check_and_train_marl(algorithms_to_run, output_dir):
                 offload_solver.algo_name = "MATWOPPO_Offload"
                 offload_solver.weight_filename = f"{offload_solver.algo_name}_{train_decoder.__class__.__name__}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
 
+                # Check Computing weight and offloading weight is exist or not
+                freq_weight_path = os.path.join(output_dir, freq_solver.weight_filename)
+                offload_weight_path = os.path.join(output_dir, offload_solver.weight_filename)
+                
+                if os.path.exists(freq_weight_path) and os.path.exists(offload_weight_path):
+                    continue
+                # ==========================================
+
                 # Load offloading weight
                 if not getattr(Config, 'MATWOPPO_TRAIN_FROM_SCRATCH', True):
                     # Find AOPPO offloading wieght

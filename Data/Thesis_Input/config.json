@@ -17,13 +17,13 @@
     },
     "algorithms": {
         "run_list": [
-            "AO", "DWPA", "DWPALF", "DWPAVO", "DWPAHF", "FIXTIME", "GUROBI", "DOLA22", "ICSOC19", "YCL24",
+            "AO", "DWPA", "DWPALF", "DWPAVO", "DWPAHF", "FIXTIME", "DOLA22", "ICSOC19", "YCL24",
             "MAAOPPO_AOXP_Dec", "MAAOPPO_AOXP_CTDE", "MAAOPPO_AOXT_Dec", "MAAOPPO_AOXT_CTDE",
             "MAPPO_XP_Dec", "MAPPO_XP_CTDE", "MAPPO_XT_Dec", "MAPPO_XT_CTDE",
             "MATWOPPO_AOXP_Dec", "MATWOPPO_AOXP_CTDE", "MATWOPPO_AOXT_Dec", "MATWOPPO_AOXT_CTDE"
         ],
         "plot_groups": {
-            "dwpa": ["DWPA", "DWPALF", "DWPAVO", "DWPAHF", "FIXTIME", "GUROBI", "AO"],
+            "dwpa": ["DWPA", "DWPALF", "DWPAVO", "DWPAHF", "FIXTIME", "AO"],
             "competitor": ["DWPA", "DOLA22", "YCL24", "ICSOC19"],
             "MAAO": ["AO", "MAAOPPO_AOXP_Dec", "MAAOPPO_AOXP_CTDE", "MAAOPPO_AOXT_Dec", "MAAOPPO_AOXT_CTDE"],
             "MA": ["AO", "MAPPO_XP_Dec", "MAPPO_XP_CTDE", "MAPPO_XT_Dec", "MAPPO_XT_CTDE"],
@@ -35,7 +35,7 @@
         "lr_critic": 1e-3,
         "gamma": 0.99,
         "batch_size": 64,
-        "episodes": 1,
+        "episodes": 50,
         "buffer_size": 100000,
         "exploration_noise": 0.05,
         "MARL_V": 1e5,

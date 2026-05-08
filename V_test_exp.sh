@@ -3,7 +3,8 @@
 DATA_ROOT="./Data"
 ALL_DATA_DIR="./Data/all_data"
 
-DEFAULT_BASE_DIR="./Data/Base_Input"
+DEFAULT_BASE_INPUT="./Data/Thesis_Input"
+DEFAULT_BASE_OUTPUT="./Data/Thesis_Output"
 TRADEOFF_OUTPUT_DIR="$DATA_ROOT/Tradeoff_Results"
 DEFAULT_START_EXP=19
 DEFAULT_START_DIGIT=6
@@ -26,30 +27,38 @@ if [ "$1" == "-d" ]; then
 fi
 
 if [ "$#" -eq 0 ]; then
-    BASE_INPUT_DIR="$DEFAULT_BASE_DIR"
+    BASE_INPUT_DIR="$DEFAULT_BASE_INPUT"
+    BASE_OUTPUT_DIR="$DEFAULT_BASE_OUTPUT"
     START_EXP="$DEFAULT_START_EXP"
     START_DIGIT="$DEFAULT_START_DIGIT"
     END_EXP="$DEFAULT_END_EXP"
     END_DIGIT="$DEFAULT_END_DIGIT"
     echo "No arguments provided. Using defaults:"
-    echo "  Base Dir:    $BASE_INPUT_DIR"
+    echo "  Base Input:  $BASE_INPUT_DIR"
+    echo "  Base Output: $BASE_OUTPUT_DIR"
     echo "  Range:       ${START_DIGIT}e${START_EXP} to ${END_DIGIT}e${END_EXP}"
-elif [ "$#" -eq 5 ]; then
+elif [ "$#" -eq 6 ]; then
     BASE_INPUT_DIR="$1"
-    START_EXP="$2"
-    START_DIGIT="$3"
-    END_EXP="$4"
-    END_DIGIT="$5"
+    BASE_OUTPUT_DIR="$2"
+    START_EXP="$3"
+    START_DIGIT="$4"
+    END_EXP="$5"
+    END_DIGIT="$6"
 else
     echo "Usage:"
     echo "  Default run: $0"
-    echo "  Custom run:  $0 [Base_dir] [start_exp] [start_digit] [end_exp] [end_digit]"
+    echo "  Custom run:  $0 [Base_input_dir] [Base_output_dir] [start_exp] [start_digit] [end_exp] [end_digit]"
     echo "  Clean data:  $0 -d"
     exit 1
 fi
 
 if [ ! -d "$BASE_INPUT_DIR" ]; then
-    echo "Error: Base directory '$BASE_INPUT_DIR' does not exist."
+    echo "Error: Base input directory '$BASE_INPUT_DIR' does not exist."
+    exit 1
+fi
+
+if [ ! -d "$BASE_OUTPUT_DIR" ]; then
+    echo "Error: Base output directory '$BASE_OUTPUT_DIR' does not exist. Cannot copy .pth weights."
     exit 1
 fi
 
@@ -101,6 +110,7 @@ for (( exp=START_EXP; exp<=END_EXP; exp++ )); do
         CURRENT_INPUT_NAME="V_${V_TAG}_Input"
         CURRENT_OUTPUT_NAME="V_${V_TAG}_Output"
         CURRENT_INPUT_PATH="$DATA_ROOT/$CURRENT_INPUT_NAME"
+        CURRENT_OUTPUT_PATH="$DATA_ROOT/$CURRENT_OUTPUT_NAME"
         
         rm -rf "$CURRENT_INPUT_PATH"
         cp -r "$BASE_INPUT_DIR" "$CURRENT_INPUT_PATH"
@@ -116,12 +126,22 @@ for (( exp=START_EXP; exp<=END_EXP; exp++ )); do
             exit 1
         fi
 
+        rm -rf "$CURRENT_OUTPUT_PATH"
+        mkdir -p "$CURRENT_OUTPUT_PATH"
+        
+        # find "$BASE_OUTPUT_DIR" -type f -name "*.pth" | while read -r pth_file; do
+        #     rel_path="${pth_file#$BASE_OUTPUT_DIR/}"
+        #     mkdir -p "$CURRENT_OUTPUT_PATH/$(dirname "$rel_path")"
+        #     cp "$pth_file" "$CURRENT_OUTPUT_PATH/$rel_path"
+        # done
+
         ./run.sh "./Data/$CURRENT_INPUT_NAME" "./Data/$CURRENT_OUTPUT_NAME"
 
-        copy_result "$V_TAG" "competitor" "Carbon_Emission" "Total_carbon.png" "Total_carbon"
-        copy_result "$V_TAG" "competitor" "Queue_Len" "Total_queue.png" "Total_queue"
-        copy_result "$V_TAG" "dwpa" "Carbon_Emission" "Total_carbon.png" "Total_carbon"
-        copy_result "$V_TAG" "dwpa" "Queue_Len" "Total_queue.png" "Total_queue"
+        echo "Copying result figures..."
+        for algo_group in "competitor" "dwpa" "MAAO" "MA" "MATWO"; do
+            copy_result "$V_TAG" "$algo_group" "Carbon_Emission" "Total_carbon.png" "Total_carbon"
+            copy_result "$V_TAG" "$algo_group" "Queue_Len" "Total_queue.png" "Total_queue"
+        done
 
     done
 done
