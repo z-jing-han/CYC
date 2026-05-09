@@ -9,7 +9,7 @@ from ..utils import RunningMeanStd
 
 class MAFreqPPOSolver(MAPPOSolver):
     def __init__(self, env, use_ctde=False):
-        super().__init__(env, decoder=QueueDecoder(), use_ctde=use_ctde)
+        super().__init__(env, decoder=FreqDecoder(), use_ctde=use_ctde)
         self.algo_name = "MAFreqPPO"
         self.weight_filename = f"{self.algo_name}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
         self.global_obs_dim = 4 * self.num_edge

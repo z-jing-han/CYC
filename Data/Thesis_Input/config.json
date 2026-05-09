@@ -17,17 +17,24 @@
     },
     "algorithms": {
         "run_list": [
-            "AO", "DWPA", "DWPALF", "DWPAVO", "DWPAHF", "FIXTIME", "DOLA22", "ICSOC19", "YCL24",
+            "AO", "DWPA", "DWPALF", "DWPAVO", "DWPAHF", "FIXTIME", "GUROBI", "DOLA22", "ICSOC19", "YCL24",
             "MAAOPPO_AOXP_Dec", "MAAOPPO_AOXP_CTDE", "MAAOPPO_AOXT_Dec", "MAAOPPO_AOXT_CTDE",
             "MAPPO_XP_Dec", "MAPPO_XP_CTDE", "MAPPO_XT_Dec", "MAPPO_XT_CTDE",
-            "MATWOPPO_AOXP_Dec", "MATWOPPO_AOXP_CTDE", "MATWOPPO_AOXT_Dec", "MATWOPPO_AOXT_CTDE"
+            "MATWOPPO_AOXP_Dec", "MATWOPPO_AOXP_CTDE", "MATWOPPO_AOXT_Dec", "MATWOPPO_AOXT_CTDE",
+            "MARAOPPO_AOXP_Dec", "MARAOPPO_AOXP_CTDE", "MARAOPPO_AOXT_Dec", "MARAOPPO_AOXT_CTDE",
+            "MARPPO_XP_Dec", "MARPPO_XP_CTDE", "MARPPO_XT_Dec", "MARPPO_XT_CTDE",
+            "MARTWOPPO_AOXP_Dec", "MARTWOPPO_AOXP_CTDE", "MARTWOPPO_AOXT_Dec", "MARTWOPPO_AOXT_CTDE"
         ],
         "plot_groups": {
             "dwpa": ["DWPA", "DWPALF", "DWPAVO", "DWPAHF", "FIXTIME", "AO"],
             "competitor": ["DWPA", "DOLA22", "YCL24", "ICSOC19"],
             "MAAO": ["AO", "MAAOPPO_AOXP_Dec", "MAAOPPO_AOXP_CTDE", "MAAOPPO_AOXT_Dec", "MAAOPPO_AOXT_CTDE"],
             "MA": ["AO", "MAPPO_XP_Dec", "MAPPO_XP_CTDE", "MAPPO_XT_Dec", "MAPPO_XT_CTDE"],
-            "MATWO": ["AO", "MATWOPPO_AOXP_Dec", "MATWOPPO_AOXP_CTDE", "MATWOPPO_AOXT_Dec", "MATWOPPO_AOXT_CTDE"]
+            "MATWO": ["AO", "MATWOPPO_AOXP_Dec", "MATWOPPO_AOXP_CTDE", "MATWOPPO_AOXT_Dec", "MATWOPPO_AOXT_CTDE"],
+            "MARAO": ["AO", "MARAOPPO_AOXP_Dec", "MARAOPPO_AOXP_CTDE", "MARAOPPO_AOXT_Dec", "MARAOPPO_AOXT_CTDE"],
+            "MAR": ["AO", "MARPPO_XP_Dec", "MARPPO_XP_CTDE", "MARPPO_XT_Dec", "MARPPO_XT_CTDE"],
+            "MARTWO": ["AO", "MARTWOPPO_AOXP_Dec", "MARTWOPPO_AOXP_CTDE", "MARTWOPPO_AOXT_Dec", "MARTWOPPO_AOXT_CTDE"],
+            "BEST": ["AO", "MARPPO_XT_CTDE", "MAAOPPO_AOXT_CTDE", "MARAOPPO_AOXT_CTDE"]
         }
     },
     "marl_settings": {
