@@ -182,7 +182,6 @@ class MARPPOSolver(BaseMARLSolver):
         return decisions
 
     def train(self, rollouts):
-        """RNN 版本的 PPO Update"""
         for i in range(self.num_edge):
             agent = self.agents[i]
             

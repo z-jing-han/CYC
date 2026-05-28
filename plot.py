@@ -23,7 +23,10 @@ def parse_arguments():
     parser.add_argument('--plot_tradeoff', action='store_true', 
                         help="Plot trade-off for V parameter experiments")
     parser.add_argument('--tradeoff_data_dir', type=str, 
-                        help="Directory containing all V_*_Input and V_*_Output folders")
+                        help="Directory containing all *_Input and *_Output folders")
+    
+    parser.add_argument('--exp_prefix', type=str, default='V', choices=['V', 'MARLV'],
+                        help="Prefix of the experiment (V or MARLV)")
     
     args = parser.parse_args()
     return args
@@ -32,25 +35,31 @@ def ensure_dir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-def plot_tradeoff(tradeoff_data_dir, output_dir, algorithms=['DWPA', 'AO', 'MAAOPPO_AOXT_CTDE']):
+def plot_tradeoff(tradeoff_data_dir, output_dir, exp_prefix='V', algorithms=['DWPA', 'AO', 'MARPPO_XT_CTDE']):
     import glob
     
-    input_dirs = glob.glob(os.path.join(tradeoff_data_dir, 'V_*_Input'))
+    search_pattern = f'{exp_prefix}_*_Input'
+    input_dirs = glob.glob(os.path.join(tradeoff_data_dir, search_pattern))
     
     results = {algo: [] for algo in algorithms}
     
     for in_dir in input_dirs:
         config_path = os.path.join(in_dir, 'config.json')
         dir_name = os.path.basename(in_dir)
-        tag = dir_name.replace('V_', '').replace('_Input', '')
-        out_dir = os.path.join(tradeoff_data_dir, f'V_{tag}_Output')
+        
+        tag = dir_name.replace(f'{exp_prefix}_', '').replace('_Input', '')
+        out_dir = os.path.join(tradeoff_data_dir, f'{exp_prefix}_{tag}_Output')
         
         if not os.path.exists(config_path):
             continue
             
         with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
-            v_val = config.get('system_settings', {}).get('trade_off_V', None)
+            
+            if exp_prefix == 'MARLV':
+                v_val = config.get('marl_settings', {}).get('MARL_V', None)
+            else:
+                v_val = config.get('system_settings', {}).get('trade_off_V', None)
             
         if v_val is not None:
             for algo in algorithms:
@@ -91,24 +100,29 @@ def plot_tradeoff(tradeoff_data_dir, output_dir, algorithms=['DWPA', 'AO', 'MAAO
                  color=colors[idx % len(colors)], label=algo)
         
         for i, txt in enumerate(v_vals):
-            plt.annotate(f'V={txt:.0e}', (carbons[i], queues[i]), 
+            label_text = f"MARL_V={txt:.0e}" if exp_prefix == 'MARLV' else f"V={txt:.0e}"
+            plt.annotate(label_text, (carbons[i], queues[i]), 
                          textcoords="offset points", xytext=(0,10), ha='center', fontsize=9)
 
     plt.xlabel('Total Carbon Emission (g)')
     plt.ylabel('Total Queue Length (bits)')
-    plt.title('Pareto Trade-off: Carbon Emission vs Queue Length')
+    plt.title(f'Pareto Trade-off: Carbon Emission vs Queue Length ({exp_prefix})')
     plt.grid(True)
     plt.legend(title="Algorithms")
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'tradeoff_pareto_multi.png'), dpi=300)
+    plt.savefig(os.path.join(output_dir, f'tradeoff_pareto_multi_{exp_prefix}.pdf'), dpi=300)
     plt.close()
     
     print(f"Trade-off plots successfully saved to {output_dir}")
 
-def plot_carbon_intensity(ci_history, figures_dir, config_data=None):
+import os
+import re
+
+def plot_carbon_intensity(ci_history, figures_dir, config_data=None, filename="carbon_intensity_trace.pdf"):
     """
     Plots carbon intensity traces for all servers.
-    Legend is horizontal, expanded to fill the plot width, and placed below the title.
+    Legend is placed on top horizontally, without a frame.
+    Top border is removed, and spacing between title and legend is adjusted.
     """
     
     if not ci_history:
@@ -124,17 +138,19 @@ def plot_carbon_intensity(ci_history, figures_dir, config_data=None):
     if config_data:
         try:
             for s in config_data.get('servers', {}).get('edge_servers', []):
-                short_name = s['name'].replace("Edge Server", "Edge").strip()
-                label_map[s['name']] = f"{s['city_name']} ({short_name})"
+                label_map[s['name']] = s['city_name']
             
             cloud_servers = config_data.get('servers', {}).get('cloud_servers', [])
             if cloud_servers:
                 for s in cloud_servers:
-                    label_map[s['name']] = f"{s['city_name']} (Cloud)"
+                    label_map[s['name']] = s['city_name']
         except Exception as e:
             print(f"[Plot Warning] Failed to create label map from config: {e}. Using default names.")
     
     plt.figure(figsize=(15, 8)) 
+    
+    ax = plt.gca()
+    ax.spines['top'].set_visible(False)
     
     plotted_something = False
     cloud_plotted = False
@@ -143,6 +159,9 @@ def plot_carbon_intensity(ci_history, figures_dir, config_data=None):
     for s_name, traces in ci_history.items():
         if "Edge" in s_name and len(traces) > 0:
             label = label_map.get(s_name, s_name)
+            label = re.sub(r'\s*\(Edge.*?\)', '', label)
+            label = label.replace("Edge Server", "").strip()
+            
             plt.plot(traces, label=label, alpha=0.8, linewidth=2)
             plotted_something = True
 
@@ -150,33 +169,33 @@ def plot_carbon_intensity(ci_history, figures_dir, config_data=None):
     for s_name, traces in ci_history.items():
         if "Cloud" in s_name and len(traces) > 0:
             if not cloud_plotted:
-                label = label_map.get(s_name, s_name)
-                plt.plot(traces, label=label, alpha=0.8, linewidth=2)
+                label = label_map.get(s_name, "Berkeley County (SC)")
+                label = re.sub(r'\s*Cloud Server', '', label).strip()
                 
+                plt.plot(traces, label=label, alpha=0.8, linewidth=2)
                 plotted_something = True
                 cloud_plotted = True
     
-    plt.title("Carbon Intensity Traces Across Locations", fontsize=18, fontweight='bold', pad=60) 
-    
-    plt.xlabel("Time Slot", fontsize=14)
+    plt.xlabel("Time Slot (Hours)", fontsize=14)
     plt.ylabel("Intensity (gCO2/kWh)", fontsize=14)
+    plt.xlim(left=0)
+    plt.ylim(bottom=0)
     plt.grid(True, linestyle='--', alpha=0.6)
-    
+
     if plotted_something:
         plt.legend(
-            bbox_to_anchor=(0., 1.02, 1., .102), 
-            loc='lower left',
-            ncol=6, 
-            mode="expand", 
+            loc='lower center',          
+            bbox_to_anchor=(0.5, 1.0),  
+            ncol=6,
             borderaxespad=0.,
             fontsize=12,
-            frameon=True
+            frameon=False                
         )
         
         plt.tight_layout()
+        save_path = os.path.join(figures_dir, filename)
         
-        save_path = os.path.join(figures_dir, "carbon_intensity_trace.png")
-        plt.savefig(save_path, dpi=300)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
     else:
         print("[Plot Warning] No 'Edge' or 'Cloud' servers found in ci_history to plot.")
     
@@ -194,6 +213,28 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
     algo_groups = config_data.get('algorithms', {}).get('plot_groups', {
         'default': ['DWPA']
     })
+
+    # --- Thesis Label Mapping ---
+    custom_labels = {
+        "6-3": {
+            "DWPA": "DWPA",
+            "AO": "Lya-OPT",
+            "MARPPO_XT_CTDE": "RMAPPO"
+        },
+        "6-5-1": {
+            "MARPPO_XT_CTDE": "RMAPPO",
+            "MAPPO_XT_CTDE": "MAPPO"
+        },
+        "6-5-2": {
+            "MARPPO_XT_CTDE": "RMAPPO-XT",
+            "MARPPO_XP_CTDE": "RMAPPO-XP"
+        },
+        "6-5-3": {
+            "MARPPO_XT_CTDE": "RMAPPO",
+            "MAAOPPO_AOXT_CTDE": "DecouplePPO"
+        }
+    }
+    # ----------------------------
 
     # find all csv
     csv_files = glob.glob(os.path.join(csv_dir, "stats_*.csv"))
@@ -218,7 +259,7 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
     data_store = {
         'Carbon': {k: {} for k in entities.keys()},
         'Queue': {k: {} for k in entities.keys()},
-        'Fairness': {'Total': {}}  # 系統層級指標
+        'Fairness': {'Total': {}}
     }
     
     time_index = None
@@ -253,13 +294,10 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
         except Exception as e:
             print(f"Error processing file {fpath}: {e}")
     
-    def plot_metric_group(metric_name, output_folder, y_label, file_suffix, allowed_algos):
-        """
-        metric_name: 'Carbon', 'Queue', or 'Fairness'
-        output_folder: specific folder path (e.g. figures/dwpa/Carbon_Emission)
-        allowed_algos: list of algorithms to plot for this group
-        """
-        
+    def plot_metric_group(metric_name, output_folder, y_label, file_suffix, allowed_algos, label_map=None):
+        if label_map is None:
+            label_map = {}
+            
         for entity_key, algo_data in data_store[metric_name].items():
             # Filter: Only include algos that are in the allowed list AND exist in data
             filtered_data = {algo: series for algo, series in algo_data.items() if algo in allowed_algos}
@@ -272,11 +310,12 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
             # Sort keys to ensure consistent color assignment if needed, or just iterate
             for algo in sorted(filtered_data.keys()):
                 series = filtered_data[algo]
-                plt.plot(time_index, series, label=algo, linewidth=2, alpha=0.8)
+                display_label = label_map.get(algo, algo) 
+                plt.plot(time_index, series, label=display_label, linewidth=2, alpha=0.8)
             
             entity_label = entities[entity_key]['label']
             plt.title(f'{entity_label} - {metric_name}', fontsize=16, fontweight='bold')
-            plt.xlabel('Time Slot', fontsize=12)
+            plt.xlabel('Time Slot (Hours)', fontsize=12)
             plt.ylabel(y_label, fontsize=12)
             plt.legend(title="Algorithm", loc='upper right', frameon=True)
             plt.grid(True, linestyle='--', alpha=0.7)
@@ -286,7 +325,7 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
                 
             plt.tight_layout()
 
-            filename = f"{entity_key}_{file_suffix}.png"
+            filename = f"{entity_key}_{file_suffix}.pdf"
             out_path = os.path.join(output_folder, filename)
             try:
                 plt.savefig(out_path, dpi=300)
@@ -294,7 +333,51 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
                 print(f"  -> Error saving {filename}: {e}")
             finally:
                 plt.close()
-    
+
+    def plot_diff_metric_group(metric_name, output_folder, y_label, file_suffix, allowed_algos, label_map, baseline_algo):
+        if label_map is None:
+            label_map = {}
+            
+        for entity_key, algo_data in data_store[metric_name].items():
+            filtered_data = {algo: series for algo, series in algo_data.items() if algo in allowed_algos}
+            
+            if not filtered_data or baseline_algo not in filtered_data:
+                continue
+
+            plt.figure(figsize=(10, 6))
+            baseline_series = filtered_data[baseline_algo]
+            
+            for algo in sorted(filtered_data.keys()):
+                series = filtered_data[algo]
+                diff_series = series - baseline_series
+                display_label = label_map.get(algo, algo) 
+                
+                if algo == baseline_algo:
+                    plt.plot(time_index, diff_series, label=f'{display_label} (Baseline)', 
+                             linewidth=2, linestyle='--', color='black', alpha=0.8)
+                else:
+                    plt.plot(time_index, diff_series, label=display_label, linewidth=2, alpha=0.8)
+            
+            entity_label = entities[entity_key]['label']
+            baseline_display_name = label_map.get(baseline_algo, baseline_algo)
+            plt.title(f'{entity_label} - {metric_name} Difference (vs {baseline_display_name})', fontsize=16, fontweight='bold')
+            plt.xlabel('Time Slot (Hours)', fontsize=12)
+            plt.ylabel(y_label, fontsize=12)
+            plt.legend(title="Algorithm", loc='upper right', frameon=True)
+            plt.grid(True, linestyle='--', alpha=0.7)
+            
+            plt.tight_layout()
+
+            filename = f"{entity_key}_{file_suffix}_diff.pdf"
+            out_path = os.path.join(output_folder, filename)
+            try:
+                plt.savefig(out_path, dpi=300)
+            except Exception as e:
+                print(f"  -> Error saving {filename}: {e}")
+            finally:
+                plt.close()
+    # -----------------------------------
+
     # 2. Iterate through groups and plot
     for group_name, allowed_list in algo_groups.items():
         group_base_dir = os.path.join(figures_dir, group_name)
@@ -306,20 +389,37 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
         ensure_dir(queue_dir)
         ensure_dir(fairness_dir)
 
+        current_label_map = custom_labels.get(group_name, {})
+
         plot_metric_group(
             metric_name='Carbon',
             output_folder=carbon_dir,
             y_label='Carbon Emission (g)',
             file_suffix='carbon',
-            allowed_algos=allowed_list
+            allowed_algos=allowed_list,
+            label_map=current_label_map
         )
+
+        # --- Thesis 6-3 Plot diff result ---
+        if group_name == "6-3":
+            plot_diff_metric_group(
+                metric_name='Carbon',
+                output_folder=carbon_dir,
+                y_label='Carbon Emission Diff (g)',
+                file_suffix='carbon',
+                allowed_algos=allowed_list,
+                label_map=current_label_map,
+                baseline_algo="MARPPO_XT_CTDE"
+            )
+        # -----------------------------------
 
         plot_metric_group(
             metric_name='Queue',
             output_folder=queue_dir,
             y_label='Queue Length (MB)',
             file_suffix='queue',
-            allowed_algos=allowed_list
+            allowed_algos=allowed_list,
+            label_map=current_label_map
         )
         
         plot_metric_group(
@@ -327,7 +427,8 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
             output_folder=fairness_dir,
             y_label="Jain's Fairness Index",
             file_suffix='fairness',
-            allowed_algos=allowed_list
+            allowed_algos=allowed_list,
+            label_map=current_label_map
         )
 
 if __name__ == "__main__":
@@ -337,7 +438,7 @@ if __name__ == "__main__":
         if not args.tradeoff_data_dir:
             print("Error: --tradeoff_data_dir is required for plotting trade-off.")
             exit(1)
-        plot_tradeoff(args.tradeoff_data_dir, args.output_dir)
+        plot_tradeoff(args.tradeoff_data_dir, args.output_dir, exp_prefix=args.exp_prefix)
         exit(0)
     
     figures_dir = os.path.join(args.output_dir, 'figures')
@@ -374,3 +475,23 @@ if __name__ == "__main__":
         process_and_plot_simulation_details(stats_csv_dir, figures_dir, config_data_for_plot)
     else:
         print(f"[Error] CSV directory not found: {stats_csv_dir}")
+    
+    ci_train_input_path = os.path.join(args.input_dir, 'carbon_intensity_train.csv')
+    if os.path.exists(ci_train_input_path):
+        try:
+            loader_train = DataLoader(
+                config_path=config_input_path, 
+                carbon_path=ci_train_input_path,
+                task_path=task_input_path
+            )
+            
+            _, ci_history_train, _, _ = loader_train.load_data()
+            plot_carbon_intensity(
+                ci_history_train, 
+                figures_dir, 
+                config_data=config_data_for_plot, 
+                filename="carbon_intensity_train_trace.pdf"
+            )
+        except Exception as e:
+            print(f"[Warning] Failed to load training data via DataLoader: {e}")
+            print("Skipping Training Carbon Intensity Trace plot.")

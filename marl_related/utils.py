@@ -1,56 +1,33 @@
 import numpy as np
 from config import Config
 
-def calculate_rewards(state, next_state, info, carbon, decisions, V_param=Config.MARL_V, penalty_weight=1e6):
+def calculate_rewards(state, next_state, info, carbon, decisions):
     rewards = {}
     num_edge = len(state['Q_edge'])
     edge_metrics = info.get('edge_metrics', [])
     cloud_metrics = info.get('cloud_metrics', [])
-    penalties = decisions.get('penalties', np.zeros(num_edge))
-
-    IS_TOLERANCE, IS_TOTAL_PENALTY, IS_DRIFT, IS_TOTAL_ONLY  = False, False, True, False
-    if IS_TOTAL_ONLY and not IS_TOTAL_PENALTY:
-        raise ValueError("IS_TOTAL_PENALTY must be True if IS_TOTAL_ONLY is True")
 
     BITS_TO_MB = 8 * 1024 * 1024
-    TOLERANCE_MB = 15000.0 if IS_TOLERANCE else 0.0
-    global_reward_scale = 1e-6
 
     for i in range(num_edge):
-        # Queue Penalty
-        q_edge_t_minus_1 = max(0.0, (state['Q_edge'][i] / BITS_TO_MB) - TOLERANCE_MB)
-        q_cloud_t_minus_1 = max(0.0, (state['Q_cloud'][i] / BITS_TO_MB) - TOLERANCE_MB)
-        q_edge_t = max(0.0, (next_state['Q_edge'][i] / BITS_TO_MB) - TOLERANCE_MB)
-        q_cloud_t = max(0.0, (next_state['Q_cloud'][i] / BITS_TO_MB) - TOLERANCE_MB)
+        q_edge_t_minus_1 = state['Q_edge'][i] / BITS_TO_MB
+        q_cloud_t_minus_1 = state['Q_cloud'][i] / BITS_TO_MB
         
-        # Different Penalty
-        edge_penalty = (0.5 if IS_DRIFT else 1.0) * ((q_edge_t ** (2 if IS_DRIFT else 1.0)) - (q_edge_t_minus_1 ** (2 if IS_DRIFT else 1.0)))
-        cloud_penalty = (0.5 if IS_DRIFT else 1.0) * ((q_cloud_t ** (2 if IS_DRIFT else 1.0)) - (q_cloud_t_minus_1 ** (2 if IS_DRIFT else 1.0)))
+        q_edge_t = next_state['Q_edge'][i] / BITS_TO_MB
+        q_cloud_t = next_state['Q_cloud'][i] / BITS_TO_MB
         
-        # print("edge_penalty", edge_penalty)
-        # print("cloud_penalty", cloud_penalty)
+        delta_q_edge_sq = (q_edge_t ** 2) - (q_edge_t_minus_1 ** 2)
+        delta_q_cloud_sq = (q_cloud_t ** 2) - (q_cloud_t_minus_1 ** 2)
+        total_queue_drift = delta_q_edge_sq + delta_q_cloud_sq
 
-        # Total Queue len penalty
-        absolute_penalty = 0.0001 * ((next_state['Q_edge'][i] / BITS_TO_MB) + (next_state['Q_cloud'][i] / BITS_TO_MB)) if IS_TOTAL_PENALTY else 0.0
-
-        queue_penalty = (0.0 if IS_TOTAL_ONLY else edge_penalty + cloud_penalty) + absolute_penalty
-
-        # print("queue_penalty", queue_penalty)
-
-        # Carbon Penalty
         carbon_penalty = 0.0
         if i < len(edge_metrics):
             carbon_penalty += edge_metrics[i]['carbon']
         if i < len(cloud_metrics):
             carbon_penalty += cloud_metrics[i]['carbon']
         
-        # print("carbon_penalty", carbon_penalty)
+        rewards[i] = - (Config.Beta1 * total_queue_drift + Config.Beta2 * carbon_penalty)
 
-        power_violation_penalty = penalty_weight * penalties[i]
-        
-        rewards[i] = - (queue_penalty + V_param * carbon_penalty + power_violation_penalty) * global_reward_scale
-
-    # print("rewards", rewards) 
     return rewards
 
 def compute_actual_x_and_p(x_target, t_alloc, W, g, N0, p_max):
@@ -125,9 +102,6 @@ def compute_ao_state(state):
         else:
             f_edge[i] = Config.EDGE_F_MAX
 
-        # Const f_edge test
-        # f_edge[i] = Config.EDGE_F_MAX * 2 / 9
-
         bits_local = (f_edge[i] / Config.PHI) * Config.TIME_SLOT_DURATION
         Q_edge[i] = max(0, Q_edge[i] - bits_local)
         
@@ -137,9 +111,6 @@ def compute_ao_state(state):
             f_cloud[i] = np.clip(np.sqrt(Q_cloud[i] / denom_c), 0, Config.CLOUD_F_MAX)
         else:
             f_cloud[i] = Config.CLOUD_F_MAX
-
-        # Const f_cloud test
-        # f_cloud[i] = Config.CLOUD_F_MAX * 2 / 9
 
         bits_cloud = (f_cloud[i] / Config.PHI) * Config.TIME_SLOT_DURATION
         Q_cloud[i] = max(0, Q_cloud[i] - bits_cloud)

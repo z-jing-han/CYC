@@ -68,7 +68,8 @@ class DataLoader:
                 Config.MARL_EPISODES = marl_cfg.get('episodes', 15)
                 Config.MARL_BUFFER_SIZE = marl_cfg.get('buffer_size', 10000)
                 Config.MARL_NOISE = marl_cfg.get('exploration_noise', 0.05)
-                Config.MARL_V = marl_cfg.get('MARL_V', 1e11)
+                Config.Beta1 = marl_cfg.get('Beta1', 5e-7)
+                Config.Beta2 = marl_cfg.get('Beta2', 0.1)
                 Config.OBSERVATION_PREV = True if marl_cfg['Observation'] == 'prev' else False
 
             for i in range(Config.NUM_EDGE_SERVERS):

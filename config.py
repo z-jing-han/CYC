@@ -48,6 +48,8 @@ class Config:
     MARL_EPISODES = 15
     MARL_BUFFER_SIZE = 10000
     MARL_NOISE = 0.05
-    MARL_V = 1e11
+    # MARL_V = 1e11
+    Beta1 = 5e-7
+    Beta2 = 0.1
     OBSERVATION_PREV = False
     MATWOPPO_TRAIN_FROM_SCRATCH = True

@@ -120,8 +120,6 @@ def setup_marl_solver(algorithm_config_str, env, output_dir):
 
         return MATWOPPOWrapper(freq_solver, offload_solver)
     elif algo_name == 'MARTWOPPO':
-        # === 加入 MARTWOPPO 的讀取邏輯 ===
-        
         freq_solver = MARFreqPPOSolver(env, use_ctde)
         freq_solver.algo_name = "MARTWOPPO_Freq"
         freq_solver.weight_filename = f"{freq_solver.algo_name}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
@@ -329,7 +327,7 @@ def run_ddpg_training(env, solver, output_dir):
             epoch_queue.append(np.mean(next_state['Q_edge'])) 
             epoch_carbon += carbon
 
-            rewards = calculate_rewards(state, next_state, info, carbon, decisions, V_param=Config.MARL_V)
+            rewards = calculate_rewards(state, next_state, info, carbon, decisions)
             epoch_reward += sum(rewards.values())
             
             obs_dict, act_dict, nobs_dict = {}, {}, {}
@@ -403,7 +401,7 @@ def run_mappo_training(env, solver, output_dir):
             epoch_queue.append(np.mean(next_state['Q_edge'])) 
             epoch_carbon += carbon
             
-            rewards = calculate_rewards(state, next_state, info, carbon, decisions, V_param=Config.MARL_V)
+            rewards = calculate_rewards(state, next_state, info, carbon, decisions)
             epoch_reward += sum(rewards.values())
             
             global_obs = np.concatenate([solver._extract_obs(state, j).squeeze(0).cpu().numpy() for j in range(env.num_edge)])
@@ -490,7 +488,7 @@ def run_decoupled_split_ppo_training(env, freq_solver, offload_solver, output_di
             
             combined_dec = {**o_dec, 'f_edge': f_dec['f_edge'], 'f_cloud': f_dec['f_cloud']}
             next_state, carbon, done, info = env.step(combined_dec)
-            rewards = calculate_rewards(state, next_state, info, carbon, combined_dec, V_param=Config.MARL_V)
+            rewards = calculate_rewards(state, next_state, info, carbon, combined_dec)
 
             epoch_queue.append(np.mean(next_state['Q_edge']))
             epoch_carbon += carbon
@@ -617,7 +615,7 @@ def run_rmappo_training(env, solver, output_dir):
             epoch_queue.append(np.mean(next_state['Q_edge'])) 
             epoch_carbon += carbon
             
-            rewards = calculate_rewards(state, next_state, info, carbon, decisions, V_param=Config.MARL_V)
+            rewards = calculate_rewards(state, next_state, info, carbon, decisions)
             epoch_reward += sum(rewards.values())
             
             global_obs = np.concatenate([solver._extract_obs(state, j).squeeze(0).cpu().numpy() for j in range(env.num_edge)])
@@ -707,7 +705,7 @@ def run_decoupled_split_rmappo_training(env, freq_solver, offload_solver, output
             
             combined_dec = {**o_dec, 'f_edge': f_dec['f_edge'], 'f_cloud': f_dec['f_cloud']}
             next_state, carbon, done, info = env.step(combined_dec)
-            rewards = calculate_rewards(state, next_state, info, carbon, combined_dec, V_param=Config.MARL_V)
+            rewards = calculate_rewards(state, next_state, info, carbon, combined_dec)
 
             epoch_queue.append(np.mean(next_state['Q_edge']))
             epoch_carbon += carbon
