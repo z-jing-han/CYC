@@ -35,10 +35,9 @@
             "MAR": ["AO", "MARPPO_XP_Dec", "MARPPO_XP_CTDE", "MARPPO_XT_Dec", "MARPPO_XT_CTDE"],
             "MARTWO": ["AO", "MARTWOPPO_AOXP_Dec", "MARTWOPPO_AOXP_CTDE", "MARTWOPPO_AOXT_Dec", "MARTWOPPO_AOXT_CTDE"],
             "BEST": ["AO", "MARPPO_XT_CTDE", "MAAOPPO_AOXT_CTDE", "MARAOPPO_AOXT_CTDE"],
-            "6-3": ["DWPA", "AO", "MARPPO_XT_CTDE"],
+            "6-3": ["DWPA", "AO", "MARPPO_XT_CTDE", "MAAOPPO_AOXT_CTDE"],
             "6-5-1": ["MARPPO_XT_CTDE", "MAPPO_XT_CTDE"],
-            "6-5-2": ["MARPPO_XT_CTDE", "MARPPO_XP_CTDE"],
-            "6-5-3": ["MARPPO_XT_CTDE", "MAAOPPO_AOXT_CTDE"]
+            "6-5-2": ["MARPPO_XT_CTDE", "MARPPO_XP_CTDE"]
         }
     },
     "marl_settings": {
@@ -46,7 +45,7 @@
         "lr_critic": 1e-3,
         "gamma": 0.99,
         "batch_size": 64,
-        "episodes": 1,
+        "episodes": 50,
         "buffer_size": 100000,
         "exploration_noise": 0.05,
         "Beta1": 5e-7,

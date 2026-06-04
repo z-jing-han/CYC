@@ -7,11 +7,9 @@
 ./run.sh
 ./run.sh [Input_dir] [Output_dir]
 ```
-
-### Test different V
-```
-./V_test_exp.sh [Base_Input_dir] [Base_Output_dir] [start exp V] [start digit V] [end exp V] [start digit V]
-./V_test_exp.sh -d
+### Find local senario
+```.bash
+python Data/extract_log.py Data/Thesis_Output/logs/log_MARPPO_XT_CTDE.txt
 ```
 
 ### Notation Mapping
@@ -24,21 +22,6 @@
 |Lya-OPT|"AO"|AOSolver|Nan|`dwpa_opt/AO.py`|
 |DARLA|"MAAOPPO*", "MARAOPPO*"|MAAOPPOSolver|AOXT, AOXP|`marl_related/algorithm_relate/ao_solver.py`|
 |RMAPPO|"MARPPO_XT_CTDE"|MARPPOSolver|XT|`marl_related/algorithm_relate/rmappo_solver.py`|
-
-
-"6-3": ["DWPA", "AO", "MARPPO_XT_CTDE"]
-    DWPA              -> DWPA
-    AO                -> Lya-OPT
-    MARPPO_XT_CTDE    -> RMAPPO
-"6-5-1": ["MARPPO_XT_CTDE", "MAPPO_XT_CTDE"]
-    MARPPO_XT_CTDE    -> RMAPPO
-    MAPPO_XT_CTDE     -> MAPPO
-"6-5-2": ["MARPPO_XT_CTDE", "MARPPO_XP_CTDE"]
-    MARPPO_XT_CTDE    -> RMAPPO-XT
-    MARPPO_XP_CTDE    -> RMAPPO-XP
-"6-5-3": ["MARPPO_XT_CTDE", "MAAOPPO_AOXT_CTDE"]
-    MARPPO_XT_CTDE    -> RMAPPO
-    MAAOPPO_AOXT_CTDE -> DecouplePPO
 
 ### Current Algorithm run list
 

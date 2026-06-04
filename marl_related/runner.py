@@ -89,7 +89,7 @@ def setup_marl_solver(algorithm_config_str, env, output_dir):
         freq_solver.algo_name = "MATWOPPO_Freq"
         freq_solver.weight_filename = f"{freq_solver.algo_name}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
         
-        freq_path = os.path.join(output_dir, freq_solver.weight_filename)
+        freq_path = os.path.join(output_dir, "weight", freq_solver.weight_filename)
         if os.path.exists(freq_path):
             freq_solver.load_weights(output_dir)
             freq_solver.is_training = False
@@ -101,14 +101,14 @@ def setup_marl_solver(algorithm_config_str, env, output_dir):
         offload_solver.algo_name = "MATWOPPO_Offload"
         offload_solver.weight_filename = f"{offload_solver.algo_name}_{decoder_instance.__class__.__name__}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
         
-        offload_path = os.path.join(output_dir, offload_solver.weight_filename)
+        offload_path = os.path.join(output_dir, "weight", offload_solver.weight_filename)
         if os.path.exists(offload_path):
             offload_solver.load_weights(output_dir)
             offload_solver.is_training = False
         else:
             # Compatibility: Fallback to MAAOPPO weights if no checkpoints were updated during offload training
             ao_weight_name = f"MAAOPPO_{decoder_instance.__class__.__name__}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
-            ao_weight_path = os.path.join(output_dir, ao_weight_name)
+            ao_weight_path = os.path.join(output_dir, "weight", ao_weight_name)
             if os.path.exists(ao_weight_path):
                 original_name = offload_solver.weight_filename
                 offload_solver.weight_filename = ao_weight_name
@@ -124,7 +124,7 @@ def setup_marl_solver(algorithm_config_str, env, output_dir):
         freq_solver.algo_name = "MARTWOPPO_Freq"
         freq_solver.weight_filename = f"{freq_solver.algo_name}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
         
-        freq_path = os.path.join(output_dir, freq_solver.weight_filename)
+        freq_path = os.path.join(output_dir, "weight", freq_solver.weight_filename)
         if os.path.exists(freq_path):
             freq_solver.load_weights(output_dir)
             freq_solver.is_training = False
@@ -135,14 +135,14 @@ def setup_marl_solver(algorithm_config_str, env, output_dir):
         offload_solver.algo_name = "MARTWOPPO_Offload"
         offload_solver.weight_filename = f"{offload_solver.algo_name}_{decoder_instance.__class__.__name__}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
         
-        offload_path = os.path.join(output_dir, offload_solver.weight_filename)
+        offload_path = os.path.join(output_dir, "weight", offload_solver.weight_filename)
         if os.path.exists(offload_path):
             offload_solver.load_weights(output_dir)
             offload_solver.is_training = False
         else:
             # Load weight from MARAOPPO
             ao_weight_name = f"MARAOPPO_{decoder_instance.__class__.__name__}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
-            ao_weight_path = os.path.join(output_dir, ao_weight_name)
+            ao_weight_path = os.path.join(output_dir, "weight", ao_weight_name)
             if os.path.exists(ao_weight_path):
                 original_name = offload_solver.weight_filename
                 offload_solver.weight_filename = ao_weight_name
@@ -157,7 +157,7 @@ def setup_marl_solver(algorithm_config_str, env, output_dir):
         SolverClass = available_marl_solvers[algo_name]
         solver = SolverClass(env=env, decoder=decoder_instance, use_ctde=use_ctde)
 
-        weights_path = os.path.join(output_dir, solver.weight_filename)
+        weights_path = os.path.join(output_dir, "weight", solver.weight_filename)
         if os.path.exists(weights_path):
             solver.load_weights(output_dir)
             solver.is_training = False 
@@ -222,8 +222,8 @@ def check_and_train_marl(algorithms_to_run, output_dir):
                 offload_solver.weight_filename = f"{offload_solver.algo_name}_{train_decoder.__class__.__name__}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
 
                 # Check Computing weight and offloading weight is exist or not
-                freq_weight_path = os.path.join(output_dir, freq_solver.weight_filename)
-                offload_weight_path = os.path.join(output_dir, offload_solver.weight_filename)
+                freq_weight_path = os.path.join(output_dir, "weight", freq_solver.weight_filename)
+                offload_weight_path = os.path.join(output_dir, "weight", offload_solver.weight_filename)
                 
                 if os.path.exists(freq_weight_path) and os.path.exists(offload_weight_path):
                     continue
@@ -232,7 +232,7 @@ def check_and_train_marl(algorithms_to_run, output_dir):
                 if not getattr(Config, 'MATWOPPO_TRAIN_FROM_SCRATCH', True):
                     # Find AOPPO offloading wieght
                     ao_weight_name = f"MAAOPPO_{train_decoder.__class__.__name__}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
-                    ao_weight_path = os.path.join(output_dir, ao_weight_name)
+                    ao_weight_path = os.path.join(output_dir, "weight", ao_weight_name)
                     
                     if os.path.exists(ao_weight_path):
                         original_name = offload_solver.weight_filename
@@ -261,8 +261,8 @@ def check_and_train_marl(algorithms_to_run, output_dir):
                 offload_solver.algo_name = "MARTWOPPO_Offload"
                 offload_solver.weight_filename = f"{offload_solver.algo_name}_{train_decoder.__class__.__name__}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
 
-                freq_weight_path = os.path.join(output_dir, freq_solver.weight_filename)
-                offload_weight_path = os.path.join(output_dir, offload_solver.weight_filename)
+                freq_weight_path = os.path.join(output_dir, "weight", freq_solver.weight_filename)
+                offload_weight_path = os.path.join(output_dir, "weight", offload_solver.weight_filename)
                 
                 if os.path.exists(freq_weight_path) and os.path.exists(offload_weight_path):
                     continue
@@ -270,7 +270,7 @@ def check_and_train_marl(algorithms_to_run, output_dir):
                 if not getattr(Config, 'MATWOPPO_TRAIN_FROM_SCRATCH', True):
                     # Load weight from MARAOPPO
                     ao_weight_name = f"MARAOPPO_{train_decoder.__class__.__name__}_{'CTDE' if use_ctde else 'Decentralized'}_weights.pth"
-                    ao_weight_path = os.path.join(output_dir, ao_weight_name)
+                    ao_weight_path = os.path.join(output_dir, "weight", ao_weight_name)
                     
                     if os.path.exists(ao_weight_path):
                         original_name = offload_solver.weight_filename
@@ -292,7 +292,7 @@ def check_and_train_marl(algorithms_to_run, output_dir):
                 print(f"[Warning] Unknown algorithm name {algo_name}")
                 continue
             
-            expected_weight_path = os.path.join(output_dir, train_solver.weight_filename)
+            expected_weight_path = os.path.join(output_dir, "weight", train_solver.weight_filename)
             
             if not os.path.exists(expected_weight_path):
                 print(f"[Training] Start training for {algo_config_str}...")

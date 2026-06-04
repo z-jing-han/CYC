@@ -19,101 +19,12 @@ def parse_arguments():
                         help="Directory containing raw input data (e.g., carbon_intensity.csv)")
     parser.add_argument('--output_dir', type=str, required=True, 
                         help="Directory where 'csv' folder is located and where 'figures' folder will be created")
-    
-    parser.add_argument('--plot_tradeoff', action='store_true', 
-                        help="Plot trade-off for V parameter experiments")
-    parser.add_argument('--tradeoff_data_dir', type=str, 
-                        help="Directory containing all *_Input and *_Output folders")
-    
-    parser.add_argument('--exp_prefix', type=str, default='V', choices=['V', 'MARLV'],
-                        help="Prefix of the experiment (V or MARLV)")
-    
     args = parser.parse_args()
     return args
 
 def ensure_dir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
-
-def plot_tradeoff(tradeoff_data_dir, output_dir, exp_prefix='V', algorithms=['DWPA', 'AO', 'MARPPO_XT_CTDE']):
-    import glob
-    
-    search_pattern = f'{exp_prefix}_*_Input'
-    input_dirs = glob.glob(os.path.join(tradeoff_data_dir, search_pattern))
-    
-    results = {algo: [] for algo in algorithms}
-    
-    for in_dir in input_dirs:
-        config_path = os.path.join(in_dir, 'config.json')
-        dir_name = os.path.basename(in_dir)
-        
-        tag = dir_name.replace(f'{exp_prefix}_', '').replace('_Input', '')
-        out_dir = os.path.join(tradeoff_data_dir, f'{exp_prefix}_{tag}_Output')
-        
-        if not os.path.exists(config_path):
-            continue
-            
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-            
-            if exp_prefix == 'MARLV':
-                v_val = config.get('marl_settings', {}).get('MARL_V', None)
-            else:
-                v_val = config.get('system_settings', {}).get('trade_off_V', None)
-            
-        if v_val is not None:
-            for algo in algorithms:
-                csv_path = os.path.join(out_dir, 'csv', f'stats_{algo}.csv') 
-                
-                if not os.path.exists(csv_path):
-                    continue
-                    
-                try:
-                    df = pd.read_csv(csv_path)
-                    carbon_cols = [c for c in df.columns if 'Carbon(g)' in c]
-                    total_carbon = df[carbon_cols].sum().sum()
-                    
-                    queue_cols = [c for c in df.columns if 'Q_Post(bits)' in c]
-                    total_queue = df[queue_cols].sum().sum()
-                    
-                    results[algo].append((v_val, total_carbon, total_queue))
-                except Exception as e:
-                    print(f"[Warning] Failed to process {csv_path}: {e}")
-                
-    ensure_dir(output_dir)
-    
-    plt.figure(figsize=(10, 8))
-    
-    markers = ['^', 'o', 's', 'D', 'v']
-    colors = ['purple', 'tab:blue', 'tab:orange', 'tab:green', 'tab:red']
-    
-    for idx, algo in enumerate(algorithms):
-        if not results[algo]:
-            continue
-            
-        results[algo].sort(key=lambda x: x[0])
-        v_vals = [x[0] for x in results[algo]]
-        carbons = [x[1] for x in results[algo]]
-        queues = [x[2] for x in results[algo]]
-        
-        plt.plot(carbons, queues, marker=markers[idx % len(markers)], linestyle='-', 
-                 color=colors[idx % len(colors)], label=algo)
-        
-        for i, txt in enumerate(v_vals):
-            label_text = f"MARL_V={txt:.0e}" if exp_prefix == 'MARLV' else f"V={txt:.0e}"
-            plt.annotate(label_text, (carbons[i], queues[i]), 
-                         textcoords="offset points", xytext=(0,10), ha='center', fontsize=9)
-
-    plt.xlabel('Total Carbon Emission (g)')
-    plt.ylabel('Total Queue Length (bits)')
-    plt.title(f'Pareto Trade-off: Carbon Emission vs Queue Length ({exp_prefix})')
-    plt.grid(True)
-    plt.legend(title="Algorithms")
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, f'tradeoff_pareto_multi_{exp_prefix}.pdf'), dpi=300)
-    plt.close()
-    
-    print(f"Trade-off plots successfully saved to {output_dir}")
 
 import os
 import re
@@ -218,7 +129,8 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
     custom_labels = {
         "6-3": {
             "DWPA": "DWPA",
-            "AO": "Lya-OPT",
+            "AO": "LAAO",
+            "MAAOPPO_AOXT_CTDE": "HACRO",
             "MARPPO_XT_CTDE": "RMAPPO"
         },
         "6-5-1": {
@@ -228,10 +140,6 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
         "6-5-2": {
             "MARPPO_XT_CTDE": "RMAPPO-XT",
             "MARPPO_XP_CTDE": "RMAPPO-XP"
-        },
-        "6-5-3": {
-            "MARPPO_XT_CTDE": "RMAPPO",
-            "MAAOPPO_AOXT_CTDE": "DecouplePPO"
         }
     }
     # ----------------------------
@@ -376,7 +284,56 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
                 print(f"  -> Error saving {filename}: {e}")
             finally:
                 plt.close()
-    # -----------------------------------
+    
+    def plot_reward_group(csv_directory, output_folder, allowed_algos, label_map=None):
+        if label_map is None:
+            label_map = {}
+            
+        plt.figure(figsize=(10, 6))
+        plotted_something = False
+
+        def get_actual_filename(algo_name):
+            mapped_name = algo_name
+            mapped_name = mapped_name.replace("AOXP", "AO_XP").replace("AOXT", "AO_XT")
+            mapped_name = mapped_name.replace("_XP_", "_XPDecoder_").replace("_XT_", "_XTDecoder_")
+            if mapped_name.endswith("_Dec"):
+                mapped_name = mapped_name[:-4] + "_Decentralized"
+                
+            return f"{mapped_name}_Reward.csv"
+
+        for algo in allowed_algos:
+            target_filename = get_actual_filename(algo)
+            reward_csv_path = os.path.join(csv_directory, target_filename)
+            
+            if os.path.exists(reward_csv_path):
+                try:
+                    df_reward = pd.read_csv(reward_csv_path)
+                    
+                    if 'Episode' in df_reward.columns and 'Total_Reward' in df_reward.columns:
+                        display_label = label_map.get(algo, algo)
+                        plt.plot(df_reward['Episode'], df_reward['Total_Reward'], label=display_label, linewidth=2, alpha=0.8)
+                        plotted_something = True
+                except Exception as e:
+                    print(f"  -> Error processing {reward_csv_path}: {e}")
+            else:
+                pass
+
+        if plotted_something:
+            plt.title('Total Reward over Episodes', fontsize=16, fontweight='bold')
+            plt.xlabel('Episode', fontsize=12)
+            plt.ylabel('Total Reward', fontsize=12)
+            plt.legend(title="Algorithm", loc='lower right', frameon=True)
+            plt.grid(True, linestyle='--', alpha=0.7)
+            
+            plt.tight_layout()
+
+            out_path = os.path.join(output_folder, "reward.pdf")
+            try:
+                plt.savefig(out_path, dpi=300)
+            except Exception as e:
+                print(f"  -> Error saving reward.pdf: {e}")
+        
+        plt.close()
 
     # 2. Iterate through groups and plot
     for group_name, allowed_list in algo_groups.items():
@@ -411,6 +368,14 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
                 label_map=current_label_map,
                 baseline_algo="MARPPO_XT_CTDE"
             )
+            reward_dir = os.path.join(group_base_dir, 'reward')
+            ensure_dir(reward_dir)
+            plot_reward_group(
+                csv_directory=csv_dir,
+                output_folder=reward_dir,
+                allowed_algos=allowed_list,
+                label_map=current_label_map
+            )
         # -----------------------------------
 
         plot_metric_group(
@@ -433,13 +398,6 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
 
 if __name__ == "__main__":
     args = parse_arguments()
-
-    if args.plot_tradeoff:
-        if not args.tradeoff_data_dir:
-            print("Error: --tradeoff_data_dir is required for plotting trade-off.")
-            exit(1)
-        plot_tradeoff(args.tradeoff_data_dir, args.output_dir, exp_prefix=args.exp_prefix)
-        exit(0)
     
     figures_dir = os.path.join(args.output_dir, 'figures')
     ensure_dir(figures_dir)

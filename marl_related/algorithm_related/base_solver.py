@@ -90,7 +90,9 @@ class BaseMARLSolver:
         return decisions
 
     def save_weights(self, output_dir):
-        filepath = os.path.join(output_dir, self.weight_filename)
+        weight_dir = os.path.join(output_dir, "weight")
+        os.makedirs(weight_dir, exist_ok=True)
+        filepath = os.path.join(weight_dir, self.weight_filename)
         state_dicts = {}
         for i, agent in self.agents.items():
             state_dicts[i] = {
@@ -101,7 +103,8 @@ class BaseMARLSolver:
         print(f"[{self.algo_name}] Weights saved to: {filepath}")
 
     def load_weights(self, output_dir):
-        filepath = os.path.join(output_dir, self.weight_filename)
+        filepath = os.path.join(output_dir, "weight", self.weight_filename)
+        
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"Weight file not found: {filepath}")
             
