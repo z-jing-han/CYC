@@ -93,7 +93,61 @@ def generate_traffic_data(config_path, output_path):
                 current_lam = lam * current_multiplier
                 server_trace.append(np.random.poisson(current_lam))
             all_servers_data.append(server_trace)
+    elif selected_model == 'poisson-uniform-lambda':
+        params = model_config['models'].get('poisson-uniform-lambda', {})
+        mean_lam = params.get('mean_lambda_bits', 1e10)
+        min_mult = params.get('min_bound_multiplier', 0.5)
+        max_mult = params.get('max_bound_multiplier', 1.5)
+        server_lambdas = [np.random.uniform(mean_lam * min_mult, mean_lam * max_mult) for _ in range(num_servers)]
         
+        for server_idx in range(num_servers):
+            server_trace = []
+            base_lam = server_lambdas[server_idx]
+            for t in range(num_timeslots):
+                current_multiplier = surge_multiplier if surge_start <= t <= surge_end else 1.0
+                current_lam = base_lam * current_multiplier
+                server_trace.append(np.random.poisson(current_lam))
+            all_servers_data.append(server_trace)
+    elif selected_model == 'poisson-exponential-lambda':
+        params = model_config['models'].get('poisson-exponential-lambda', {})
+        mean_lam = params.get('mean_lambda_bits', 1e10)
+        server_lambdas = [np.random.exponential(scale=mean_lam) for _ in range(num_servers)]
+        for server_idx in range(num_servers):
+            server_trace = []
+            base_lam = server_lambdas[server_idx]
+            for t in range(num_timeslots):
+                current_multiplier = surge_multiplier if surge_start <= t <= surge_end else 1.0
+                current_lam = base_lam * current_multiplier
+                server_trace.append(np.random.poisson(current_lam))
+            all_servers_data.append(server_trace)
+    elif selected_model == 'zipf-poisson-distribution':
+        params = model_config['models'].get('zipf-poisson-distribution', {})
+        mean_lam = params.get('mean_lambda_bits', 1e10)
+        s_param = params.get('s_parameter', 1.0)
+        ranks = params.get('server_ranks', list(range(1, num_servers + 1))) 
+        
+        def calculate_zipf_lambdas(mean_lam, num_servers, ranks, s_param):
+            if len(ranks) != num_servers:
+                raise ValueError("Error: Length of server_ranks must match num_edge_servers.")
+            h_n = sum(1.0 / (n ** s_param) for n in range(1, num_servers + 1))
+            total_lambda = mean_lam * num_servers
+            server_lambdas = [total_lambda * ((1.0 / (r ** s_param)) / h_n) for r in ranks]
+            return server_lambdas
+
+        try:
+            server_lambdas = calculate_zipf_lambdas(mean_lam, num_servers, ranks, s_param)
+        except ValueError as e:
+            print(e)
+            return
+
+        for server_idx in range(num_servers):
+            server_trace = []
+            base_lam = server_lambdas[server_idx]
+            for t in range(num_timeslots):
+                current_multiplier = surge_multiplier if surge_start <= t <= surge_end else 1.0
+                current_lam = base_lam * current_multiplier
+                server_trace.append(np.random.poisson(current_lam))
+            all_servers_data.append(server_trace)
     elif selected_model == 'const-bit-rate':
         params = model_config['models']['const-bit-rate']
         bit_rate = params['bit-rate']
