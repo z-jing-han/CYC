@@ -2,8 +2,29 @@ name: cyc
 channels:
   - defaults
 dependencies:
-  - pip=25.3
   - python=3.12
+  - pip=25.3
   - pip:
-      - matplotlib==3.10.8
+      - torch==2.11.0+cu126
+      - torchvision==0.26.0+cu126
+      - triton==3.6.0
       - numpy==2.4.1
+      - scipy==1.17.1
+      - sympy==1.14.0
+      - cvxpy==1.8.1
+      - gurobipy==13.0.1
+      - osqp==1.1.1
+      - clarabel==0.11.1
+      - scs==3.2.11
+      - highspy==1.13.1
+      - pandas==2.3.3
+      - networkx==3.6.1
+      - narwhals==2.18.0
+      - matplotlib==3.10.8
+      - seaborn==0.13.2
+      - plotly==6.6.0
+      - pillow==12.1.0
+      - pymupdf==1.27.2.3
+      - joblib==1.5.3
+      - flake8==7.3.0
+      - jinja2==3.1.6

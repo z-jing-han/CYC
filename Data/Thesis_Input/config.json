@@ -36,8 +36,8 @@
             "MARTWO": ["AO", "MARTWOPPO_AOXP_Dec", "MARTWOPPO_AOXP_CTDE", "MARTWOPPO_AOXT_Dec", "MARTWOPPO_AOXT_CTDE"],
             "BEST": ["AO", "MARPPO_XT_CTDE", "MAAOPPO_AOXT_CTDE", "MARAOPPO_AOXT_CTDE"],
             "6-3": ["DWPA", "AO", "MARPPO_XT_CTDE", "MAAOPPO_AOXT_CTDE"],
-            "6-5-1": ["MARPPO_XT_CTDE", "MAPPO_XT_CTDE"],
-            "6-5-2": ["MARPPO_XT_CTDE", "MARPPO_XP_CTDE"]
+            "6-7-1": ["MARPPO_XT_CTDE", "MAPPO_XT_CTDE"],
+            "6-7-2": ["MARPPO_XT_CTDE", "MARPPO_XP_CTDE"]
         }
     },
     "marl_settings": {

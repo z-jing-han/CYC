@@ -133,11 +133,11 @@ def process_and_plot_simulation_details(csv_dir, figures_dir, config_data):
             "MAAOPPO_AOXT_CTDE": "HACRO",
             "MARPPO_XT_CTDE": "RMAPPO"
         },
-        "6-5-1": {
+        "6-7-1": {
             "MARPPO_XT_CTDE": "RMAPPO",
             "MAPPO_XT_CTDE": "MAPPO"
         },
-        "6-5-2": {
+        "6-7-2": {
             "MARPPO_XT_CTDE": "RMAPPO-XT",
             "MARPPO_XP_CTDE": "RMAPPO-XP"
         }
