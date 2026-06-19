@@ -6,12 +6,6 @@ Data/*
 !Data/Thesis_Input/
 Data/Thesis_Input/*
 !Data/Thesis_Input/config.json
-
-dwpa_solver
-dwpa_competitor
-
-dola22_solver.py
-icsoc19_solver.py
-ycl24_solver.py
+!Data/Thesis_Input/carbon_intensity*.csv
 
 Thesis_PDF
